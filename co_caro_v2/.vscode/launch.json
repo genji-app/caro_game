@@ -1,0 +1,18 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flutter app mobile",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "flutter", "run",
+                "-d", "18EC58C0-7CCA-4836-A01B-E5CFF5A74290",
+            ],
+            "program": "lib/main.dart"
+        }
+    ]
+}
