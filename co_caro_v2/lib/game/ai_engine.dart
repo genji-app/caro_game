@@ -779,17 +779,34 @@ class AiEngine {
     order.removeLast();
   }
 
+  /// Đếm số ô trống trên board mô phỏng của AI.
+  static int _countEmptyCells(List<List<int>> board) {
+    int count = 0;
+    final int n = board.length;
+    for (int r = 0; r < n; r++) {
+      for (int c = 0; c < n; c++) {
+        if (board[r][c] == 0) count++;
+      }
+    }
+    return count;
+  }
+
+  /// Gỡ quân cũ nhất của [player] khi bàn cờ chỉ còn đúng 1 ô trống
+  /// (tức là ô mà AI sắp đặt quân vào).  Logic này áp dụng nhất quán cho
+  /// cả 3×3 lẫn 4×4 — tránh gỡ quân sớm khi vẫn còn nhiều ô trống (lỗi 4×4).
   static List<int>? _applySlidingMoveIfNeeded({
     required List<List<int>> board,
     required int player,
     required bool isSliding,
-    required int maxPieces,
+    required int maxPieces, // tham số giữ lại cho tương thích API, không dùng để so ngưỡng
     required List<int> orderP1,
     required List<int> orderP2,
   }) {
     if (!isSliding) return null;
+    // Chỉ gỡ khi bàn gần đầy: đúng 1 ô trống còn lại (chính là ô sắp đặt)
+    if (_countEmptyCells(board) != 1) return null;
     final List<int> order = player == 1 ? orderP1 : orderP2;
-    if ((order.length ~/ 2) < maxPieces) return null;
+    if (order.isEmpty) return null;
     final int rr = order[0], rc = order[1];
     board[rr][rc] = 0;
     order.removeAt(0);

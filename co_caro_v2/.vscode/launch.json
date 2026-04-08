@@ -10,7 +10,7 @@
             "type": "dart",
             "args": [
                 "flutter", "run",
-                "-d", "18EC58C0-7CCA-4836-A01B-E5CFF5A74290",
+                "-d", "E20B6BC6-B464-475D-B6F4-CA072A0AEF6A",
             ],
             "program": "lib/main.dart"
         }

@@ -80,7 +80,8 @@ class CaroGame extends FlameGame with TapCallbacks {
   int _totalMoves = 0;
   final Random _aiRandom = Random();
   late final List<int> _zobristTable;
-  final Map<int, _TranspositionEntry> _transposition = <int, _TranspositionEntry>{};
+  final Map<int, _TranspositionEntry> _transposition =
+      <int, _TranspositionEntry>{};
   static const int _ttMaxEntries = 60000;
   int _aiRequestId = 0;
 
@@ -141,7 +142,17 @@ class CaroGame extends FlameGame with TapCallbacks {
   }
 
   bool get _usesSlidingCapRule => boardSize == 3 || boardSize == 4;
-  static const int _maxPiecesOnSmallBoards = 4;
+
+  /// Đếm số ô trống trên bàn cờ hiện tại.
+  int _countEmptyCells() {
+    int count = 0;
+    for (int r = 0; r < boardSize; r++) {
+      for (int c = 0; c < boardSize; c++) {
+        if (board[r][c] == 0) count++;
+      }
+    }
+    return count;
+  }
 
   // ─── Timer ─────────────────────────────────────────────────────────────────
 
@@ -229,7 +240,9 @@ class CaroGame extends FlameGame with TapCallbacks {
         board[m.row][m.col] = 0;
         _boardComponent.removePiece(m.row, m.col);
         _pieceOrder[m.player]!.removeLast();
-        if (_usesSlidingCapRule && m.removedRow != null && m.removedCol != null) {
+        if (_usesSlidingCapRule &&
+            m.removedRow != null &&
+            m.removedCol != null) {
           final int rr = m.removedRow!;
           final int rc = m.removedCol!;
           board[rr][rc] = m.player;
@@ -274,9 +287,13 @@ class CaroGame extends FlameGame with TapCallbacks {
   void _placeMove(int row, int col) {
     int? removedRow;
     int? removedCol;
+    // Sliding-cap rule: chỉ gỡ quân cũ nhất khi bàn cờ gần đầy
+    // (chỉ còn đúng 1 ô trống — chính là ô sắp đánh vào).
+    // Điều này đúng cho cả 3×3 (hết ô sau 8 quân) lẫn 4×4
+    // (hết ô sau 15 quân), tránh việc gỡ quân sớm khi 4×4 còn nhiều ô trống.
     if (_usesSlidingCapRule) {
       final List<Point<int>> order = _pieceOrder[_currentPlayer]!;
-      if (order.length >= _maxPiecesOnSmallBoards) {
+      if (order.isNotEmpty && _countEmptyCells() == 1) {
         final Point<int> oldest = order.removeAt(0);
         removedRow = oldest.x;
         removedCol = oldest.y;
@@ -381,7 +398,7 @@ class CaroGame extends FlameGame with TapCallbacks {
         difficultyIndex: diff.index,
         randomSeed: _aiRandom.nextInt(1 << 30),
         isSlidingCapRuleEnabled: _usesSlidingCapRule,
-        maxPiecesPerPlayer: _maxPiecesOnSmallBoards,
+        maxPiecesPerPlayer: boardSize * boardSize, // không dùng nữa — AI dùng board fullness
         orderP1: _serializeOrder(_pieceOrder[1]!),
         orderP2: _serializeOrder(_pieceOrder[2]!),
       );
@@ -475,7 +492,8 @@ class CaroGame extends FlameGame with TapCallbacks {
     return bestMove;
   }
 
-  (int, int)? _bestMoveDeepSearch(List<(int, int)> candidates, {required int maxPly}) {
+  (int, int)? _bestMoveDeepSearch(List<(int, int)> candidates,
+      {required int maxPly}) {
     int bestScore = -999999999;
     (int, int)? bestMove;
     int hash = _computeBoardHash();
@@ -516,7 +534,9 @@ class CaroGame extends FlameGame with TapCallbacks {
     required int hash,
   }) {
     if (_checkWin(lastMoveRow, lastMoveCol, lastMovePlayer) != null) {
-      return lastMovePlayer == 2 ? _aiWinTerminal - depth : _aiLoseTerminal + depth;
+      return lastMovePlayer == 2
+          ? _aiWinTerminal - depth
+          : _aiLoseTerminal + depth;
     }
     if (depth >= maxDepth || _isBoardFull()) {
       return _evaluateBoard();
@@ -544,8 +564,9 @@ class CaroGame extends FlameGame with TapCallbacks {
     if (moves.isEmpty) {
       return _evaluateBoard();
     }
-    final List<(int, int)> ordered =
-        playerToMove == 2 ? _orderMovesForAi(moves) : _orderMovesForHuman(moves);
+    final List<(int, int)> ordered = playerToMove == 2
+        ? _orderMovesForAi(moves)
+        : _orderMovesForHuman(moves);
     int best = -999999999;
     int localHash = hash;
     for (final (int r, int c) in ordered) {
@@ -594,7 +615,8 @@ class CaroGame extends FlameGame with TapCallbacks {
   }
 
   List<(int, int)> _orderMovesForAi(List<(int, int)> moves) {
-    final List<({int score, (int, int) m})> scored = <({int score, (int, int) m})>[];
+    final List<({int score, (int, int) m})> scored =
+        <({int score, (int, int) m})>[];
     for (final (int r, int c) in moves) {
       scored.add((score: _scoreMoveHeuristic(r, c, 2), m: (r, c)));
     }
@@ -603,7 +625,8 @@ class CaroGame extends FlameGame with TapCallbacks {
   }
 
   List<(int, int)> _orderMovesForHuman(List<(int, int)> moves) {
-    final List<({int score, (int, int) m})> scored = <({int score, (int, int) m})>[];
+    final List<({int score, (int, int) m})> scored =
+        <({int score, (int, int) m})>[];
     for (final (int r, int c) in moves) {
       scored.add((score: _scoreMoveHeuristic(r, c, 1), m: (r, c)));
     }
@@ -655,7 +678,8 @@ class CaroGame extends FlameGame with TapCallbacks {
     return h;
   }
 
-  List<(int, int)> _topCandidateMovesForPlayer(int forPlayer, {required int limit}) {
+  List<(int, int)> _topCandidateMovesForPlayer(int forPlayer,
+      {required int limit}) {
     final List<(int, int)> raw = _getCandidateMoves();
     if (raw.length <= limit) {
       return raw;
@@ -696,7 +720,11 @@ class CaroGame extends FlameGame with TapCallbacks {
     int openEnds = 0;
     int nr = r - dr;
     int nc = c - dc;
-    if (nr >= 0 && nr < boardSize && nc >= 0 && nc < boardSize && board[nr][nc] == 0) {
+    if (nr >= 0 &&
+        nr < boardSize &&
+        nc >= 0 &&
+        nc < boardSize &&
+        board[nr][nc] == 0) {
       openEnds++;
     }
     for (int i = 0; i < winLength; i++) {
@@ -713,7 +741,11 @@ class CaroGame extends FlameGame with TapCallbacks {
     }
     nr = r + dr * count;
     nc = c + dc * count;
-    if (nr >= 0 && nr < boardSize && nc >= 0 && nc < boardSize && board[nr][nc] == 0) {
+    if (nr >= 0 &&
+        nr < boardSize &&
+        nc >= 0 &&
+        nc < boardSize &&
+        board[nr][nc] == 0) {
       openEnds++;
     }
     if (count == 0) {
