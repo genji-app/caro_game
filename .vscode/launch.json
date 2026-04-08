@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flutter app mobile",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "deviceId": "850E9D50-3653-4DD7-BF20-9A3516FB2F27",
+            "env": {
+                "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:${env:PATH}"
+            }
+        }
+    ]
+}

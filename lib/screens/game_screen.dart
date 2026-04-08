@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flame/game.dart';
 import '../core/app_settings.dart';
+import '../core/audio_service.dart';
 import '../core/l10n.dart';
 import '../core/game_history.dart';
 import '../core/text_app_style.dart';
@@ -29,6 +30,9 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     widget.game.gameStateNotifier.addListener(_onGameStateChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AudioService().startMatchAmbience();
+    });
   }
 
   void _onGameStateChanged() {
@@ -94,6 +98,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void dispose() {
     widget.game.gameStateNotifier.removeListener(_onGameStateChanged);
+    AudioService().stopMatchAmbience();
     super.dispose();
   }
 

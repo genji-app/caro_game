@@ -239,7 +239,8 @@ class _RecordCard extends StatelessWidget {
     }
   }
 
-  String get _modeText => record.mode == GameMode.vsAI ? 'VS AI' : '2 Người';
+  String get _modeText =>
+      record.mode == GameMode.vsAI ? '🤖 VS AI' : '👥 2 Người';
 
   String _formatDate(DateTime dt) {
     return '${dt.day}/${dt.month}/${dt.year}  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';

@@ -22,6 +22,13 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
+# path_provider_foundation 2.6+ bundles package:objective_c (native_assets). A bad
+# device/simulator cache mix can produce an arm64 slice marked IOSSIMULATOR and
+# App Store rejects the IPA (code 91169). 2.4.x uses classic federated iOS code
+# without that framework — safe for store until upstream fixes are verified.
+dependency_overrides:
+  path_provider_foundation: 2.4.1
+
 flutter_launcher_icons:
   android: true
   ios: true
