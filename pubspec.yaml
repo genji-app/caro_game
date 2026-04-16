@@ -1,26 +1,109 @@
 name: co_caro_flame
 description: Cờ Caro game using Flutter Flame engine - Full Featured
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.9.2 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
+
+  # Caro game
   flame: ^1.18.0
-  audioplayers: ^6.0.0
-  shared_preferences: ^2.2.3
-  google_fonts: ^6.2.1
   flutter_animate: ^4.5.0
+  terminate_restart: ^1.1.0
   package_info_plus: ^8.0.3
+  unlock_shorebird_kit:
+    path: ../unlock_shorebird_kit
+
+  # S88 - State Management
+  flutter_riverpod: ^2.5.1
+
+  # S88 - Model
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.9.0
+
+  # S88 - Utils
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  dartz: ^0.10.1
+  crypto: ^3.0.3
+  uuid: ^4.2.1
+  device_info_plus: ^9.1.0
+  web: ^1.1.1
+  path_provider: ^2.1.0
+  isolate_manager: ^6.1.2
+  jwt_decoder: ^2.0.1
+  intl: ^0.20.2
+  gap: ^3.0.1
+  blur: ^4.0.2
+  gradient_borders: ^1.0.2
+  styled_text: ^8.1.0
+  pinput: ^6.0.1
+  shimmer_animation: ^2.1.0
+  grouped_list: ^6.0.0
+
+  # S88 - Networking
+  http: ^1.1.0
+  dio: ^5.7.0
+  connectivity_plus: ^6.1.0
+  pretty_dio_logger: ^1.4.0
+  shared_preferences: ^2.2.3
+  web_socket_channel: ^2.4.0
+  protobuf: ^6.0.0
+  fixnum: ^1.1.0
+
+  # S88 - Routing
+  go_router: ^13.2.4
+
+  # S88 - Logging & UI
+  logger: ^2.4.0
+  flutter_svg: ^2.2.2
+  cached_network_image: ^3.4.1
+  carousel_slider: ^5.1.1
+  lottie: ^3.3.2
+  rive: ^0.14.1
+  fluttertoast: ^8.2.8
+  url_launcher: ^6.2.5
+  flutter_in_app_pip: ^1.7.4
+
+  # S88 - Media
+  audioplayers: ^6.5.1
+  webview_flutter: ^4.11.2
+  webview_flutter_wkwebview: ^3.23.7
+  video_player: ^2.9.2
+
+  # S88 - Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # S88 - Local packages
+  game_api_client:
+    path: ../s88-flutter/packages/game_api_client
+  sport_socket:
+    path: ../s88-flutter/packages/sport_socket
+  adaptive_overlay:
+    path: ../s88-flutter/packages/adaptive_overlay
+  orientation_guard:
+    path: ../s88-flutter/packages/orientation_guard
+  flutter_slider_drawer:
+    path: ../s88-flutter/packages/flutter_slider_drawer
+  game_engine:
+    path: ../s88-flutter/packages/game_engine
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
+  mocktail: ^1.0.3
+  build_runner: ^2.10.1
+  freezed: ^3.2.3
+  json_serializable: ^6.8.0
+  flutter_gen_runner: ^5.12.0
+  isolate_manager_generator: ^0.3.0
 
 # path_provider_foundation 2.6+ bundles package:objective_c (native_assets). A bad
 # device/simulator cache mix can produce an arm64 slice marked IOSSIMULATOR and
@@ -42,3 +125,4 @@ flutter:
   assets:
     - assets/sounds/
     - assets/images/
+    - shorebird.yaml
