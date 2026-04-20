@@ -6,7 +6,7 @@
             "request": "launch",
             "type": "dart",
             "program": "lib/main.dart",
-            "deviceId": "R5CX10F5DBL",
+            "deviceId": "14C3F587-B70C-4828-9BC0-7C2698FEDB1F",
             "env": {
                 "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:${env:PATH}"
             }

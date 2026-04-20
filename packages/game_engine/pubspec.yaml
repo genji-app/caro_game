@@ -1,0 +1,30 @@
+name: game_engine
+description: >-
+  Supports in-house proprietary games (IHRunner) and 3rd-party live provider games (PLRunner).
+version: 1.3.0
+publish_to: none
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.27.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: ^6.1.5
+  meta: ^1.11.0
+  web: ^1.0.0
+  # Legacy dependencies (migrating to flutter_inappwebview)
+  # webview_flutter: ^4.11.2
+  # webview_flutter_wkwebview: ^3.23.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  mocktail: ^1.0.0
+  flutter_lints: ^5.0.0
+
+# The following section is specific to Flutter packages.
+flutter:

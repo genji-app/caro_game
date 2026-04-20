@@ -1,0 +1,12 @@
+name: adaptive_overlay
+description: A reusable Flutter package for building adaptive overlays with internal navigation.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.9.2
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
