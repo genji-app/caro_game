@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/build" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/audioplayers_darwin/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/audioplayers_darwin/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/audioplayers_darwin/build" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/package_info_plus/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/package_info_plus/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/package_info_plus/build" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/package_info_plus/example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/package_info_plus/example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/package_info_plus/example/build" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/restart_app/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/restart_app/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/restart_app/build" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/restart_app/example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/restart_app/example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/restart_app/example/build" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/shared_preferences_foundation/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/shared_preferences_foundation/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/shared_preferences_foundation/build" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/shared_preferences_foundation/example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/shared_preferences_foundation/example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/co_caro_v2/ios/.symlinks/plugins/shared_preferences_foundation/example/build" />
+      <excludeFolder url="file://$MODULE_DIR$/unlock_shorebird_kit/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/unlock_shorebird_kit/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/unlock_shorebird_kit/build" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
