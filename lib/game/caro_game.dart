@@ -1,15 +1,41 @@
 import 'dart:async' as async;
-import 'dart:isolate';
 import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:isolate_manager/isolate_manager.dart';
+import '../core/achievements.dart';
 import '../core/app_settings.dart';
 import '../core/audio_service.dart';
 import '../core/game_history.dart';
+import '../core/game_snapshot.dart';
 import 'board_component.dart';
 import 'ai_engine.dart';
+
+// ─── Shared AI isolate pool ───────────────────────────────────────────────────
+//
+// Một isolate duy nhất được giữ ấm xuyên suốt vòng đời app, tránh cold-start
+// ~100-200ms mỗi lần AI ra nước đi. Khởi tạo lazily ở nước đi AI đầu tiên.
+
+IsolateManager<List<int>?, AiMoveRequest>? _pooledAiIsolate;
+Future<IsolateManager<List<int>?, AiMoveRequest>>? _aiIsolateFuture;
+
+Future<IsolateManager<List<int>?, AiMoveRequest>> _ensureAiIsolate() {
+  final pooled = _pooledAiIsolate;
+  if (pooled != null) return Future<IsolateManager<List<int>?, AiMoveRequest>>.value(pooled);
+  return _aiIsolateFuture ??= () async {
+    final IsolateManager<List<int>?, AiMoveRequest> manager =
+        IsolateManager<List<int>?, AiMoveRequest>.create(
+      aiPickMoveWorker,
+      concurrent: 1,
+    );
+    await manager.start();
+    _pooledAiIsolate = manager;
+    return manager;
+  }();
+}
 
 // ─── Enums & State ────────────────────────────────────────────────────────────
 
@@ -79,10 +105,6 @@ class CaroGame extends FlameGame with TapCallbacks {
   DateTime? _gameStartTime;
   int _totalMoves = 0;
   final Random _aiRandom = Random();
-  late final List<int> _zobristTable;
-  final Map<int, _TranspositionEntry> _transposition =
-      <int, _TranspositionEntry>{};
-  static const int _ttMaxEntries = 60000;
   int _aiRequestId = 0;
 
   // Dùng để tránh gửi notify trùng trong cùng microtask
@@ -100,13 +122,16 @@ class CaroGame extends FlameGame with TapCallbacks {
 
   late BoardComponent _boardComponent;
 
-  CaroGame({required this.vsAI})
-      : boardSize = AppSettings().boardSizePreset.side,
-        winLength = AppSettings().boardSizePreset.winLength,
-        _zobristTable = _buildZobristTable(
-          AppSettings().boardSizePreset.side,
-          seed: 1337,
-        );
+  /// Constructor bình thường dùng [AppSettings.boardSizePreset].
+  /// Khi [resumeBoardSide]/[resumeWinLength] được cung cấp (từ snapshot US-003),
+  /// dùng giá trị đó thay vì preset hiện tại — tránh lỗi khi user đổi preset
+  /// trong Settings giữa lúc pause và resume.
+  CaroGame({
+    required this.vsAI,
+    int? resumeBoardSide,
+    int? resumeWinLength,
+  })  : boardSize = resumeBoardSide ?? AppSettings().boardSizePreset.side,
+        winLength = resumeWinLength ?? AppSettings().boardSizePreset.winLength;
 
   int get turnTimeSecs => AppSettings().turnTimeSecs;
 
@@ -122,6 +147,29 @@ class CaroGame extends FlameGame with TapCallbacks {
     world.add(_boardComponent);
     // _initBoard gọi SAU khi board component đã add vào world
     _initBoard();
+
+    // Warm up AI isolate ngay khi game mở nếu chơi vs AI — nước đi đầu tiên
+    // của AI sẽ không phải chờ cold-start.
+    if (vsAI) {
+      // Không await — chạy background, không chặn onLoad.
+      // Nếu start fail, _doAIMove sẽ fallback sang chạy đồng bộ ở main isolate.
+      _warmUpAiIsolate();
+    }
+  }
+
+  Future<void> _warmUpAiIsolate() async {
+    try {
+      await _ensureAiIsolate();
+    } catch (_) {
+      // Nuốt lỗi — fallback sẽ xử lý khi cần.
+    }
+  }
+
+  @override
+  void onRemove() {
+    _timer?.cancel();
+    _timer = null;
+    super.onRemove();
   }
 
   // ─── Board init ────────────────────────────────────────────────────────────
@@ -136,7 +184,6 @@ class CaroGame extends FlameGame with TapCallbacks {
     _pieceOrder[2]!.clear();
     _totalMoves = 0;
     _gameStartTime = DateTime.now();
-    _transposition.clear();
     _startTimer();
     _notify();
   }
@@ -184,6 +231,7 @@ class CaroGame extends FlameGame with TapCallbacks {
     _timer = null;
     _status = GameStatus.timeout;
     AudioService().playTimeout();
+    HapticFeedback.mediumImpact();
     if (_currentPlayer == 1) {
       oScore++;
     } else {
@@ -226,6 +274,8 @@ class CaroGame extends FlameGame with TapCallbacks {
     _timer = null;
     _initBoard();
     _boardComponent.resetAnimations();
+    // US-003: reset = clean slate, xóa snapshot cũ.
+    async.unawaited(GameSnapshotStore().clear());
     // _notify() đã được gọi bên trong _initBoard()
   }
 
@@ -313,6 +363,7 @@ class CaroGame extends FlameGame with TapCallbacks {
     _totalMoves++;
     _boardComponent.addPiece(row, col, _currentPlayer);
     AudioService().playPlace();
+    HapticFeedback.lightImpact();
 
     final wins = _checkWin(row, col, _currentPlayer);
     if (wins != null) {
@@ -327,6 +378,7 @@ class CaroGame extends FlameGame with TapCallbacks {
       }
       _boardComponent.highlightWin(winningCells);
       AudioService().playWin();
+      HapticFeedback.heavyImpact();
       _saveHistory(_currentPlayer == 1 ? GameResult.xWins : GameResult.oWins);
       _notify();
       return;
@@ -337,6 +389,7 @@ class CaroGame extends FlameGame with TapCallbacks {
       _timer = null;
       _status = GameStatus.draw;
       draws++;
+      HapticFeedback.mediumImpact();
       _saveHistory(GameResult.draw);
       _notify();
       return;
@@ -345,10 +398,109 @@ class CaroGame extends FlameGame with TapCallbacks {
     _currentPlayer = _currentPlayer == 1 ? 2 : 1;
     _startTimer();
     _notify();
+    // US-003: auto-save sau mỗi nước đi (debounce 500ms trong store).
+    _scheduleSnapshotSave();
 
     if (vsAI && _currentPlayer == 2) {
       // Keep a tiny delay for UX, but don't block timer perception.
       async.Future.delayed(const Duration(milliseconds: 80), _doAIMove);
+    }
+  }
+
+  // ─── Snapshot / Resume (US-003) ────────────────────────────────────────────
+
+  void _scheduleSnapshotSave() {
+    if (_status != GameStatus.playing) return;
+    if (_moves.isEmpty) return; // ván chưa có nước → không cần snapshot
+    final List<MoveLog> log = _moves
+        .map((MoveRecord m) => MoveLog(
+              row: m.row,
+              col: m.col,
+              player: m.player,
+              removedRow: m.removedRow,
+              removedCol: m.removedCol,
+            ))
+        .toList();
+    GameSnapshotStore().scheduleSave(GameSnapshot(
+      mode: vsAI ? GameMode.vsAI : GameMode.twoPlayers,
+      boardSide: boardSize,
+      winLength: winLength,
+      aiDifficultyIndex: vsAI ? AppSettings().aiDifficulty.index : -1,
+      moves: log,
+      timeLeftSecs: _timeLeft,
+      savedAt: DateTime.now(),
+    ));
+  }
+
+  /// Force-flush snapshot (gọi khi app sắp paused/detached).
+  Future<void> flushSnapshot() => GameSnapshotStore().flushNow();
+
+  /// Khôi phục state từ snapshot vào game đã [onLoad]. Gọi SAU khi
+  /// BoardComponent đã sẵn sàng (sau onLoad). Snapshot phải có board size khớp
+  /// với game đang chạy.
+  void applySnapshot(GameSnapshot snap) {
+    assert(snap.boardSide == boardSize,
+        'Snapshot boardSide ${snap.boardSide} != game boardSize $boardSize');
+    // Reset UI layer, giữ scores (match scores là cross-game trong session,
+    // nhưng snapshot chỉ restore ván đơn — scores có thể bị lệch khi kill app.
+    // Chấp nhận trade-off: khi resume, scores về 0 cho match mới).
+    _boardComponent.resetAnimations();
+    _initBoard();
+
+    // Apply từng nước đi như đã xảy ra: set board array, add piece visual,
+    // đẩy vào _moves + _pieceOrder để undo/win-detect hoạt động đúng.
+    for (final MoveLog m in snap.moves) {
+      // Xử lý sliding-cap removed piece TRƯỚC khi place (đúng order thời gian)
+      if (m.removedRow != null && m.removedCol != null) {
+        board[m.removedRow!][m.removedCol!] = 0;
+        _boardComponent.removePiece(m.removedRow!, m.removedCol!);
+        // Bỏ quân cũ khỏi _pieceOrder[m.player] (FIFO)
+        final List<Point<int>> order = _pieceOrder[m.player]!;
+        if (order.isNotEmpty) order.removeAt(0);
+      }
+      board[m.row][m.col] = m.player;
+      _moves.add(MoveRecord(
+        m.row,
+        m.col,
+        m.player,
+        removedRow: m.removedRow,
+        removedCol: m.removedCol,
+      ));
+      _pieceOrder[m.player]!.add(Point(m.row, m.col));
+      _boardComponent.addPiece(m.row, m.col, m.player);
+      _totalMoves++;
+    }
+
+    // currentPlayer: dựa vào nước cuối cùng — next player là đối thủ của họ.
+    if (snap.moves.isNotEmpty) {
+      _currentPlayer = snap.moves.last.player == 1 ? 2 : 1;
+    }
+
+    // Restore timer: nếu snapshot có timeLeft hợp lệ (>0 và setting bật timer),
+    // set _timeLeft = snap.timeLeftSecs trước khi _startTimer(). Tránh bị reset.
+    if (turnTimeSecs > 0 && snap.timeLeftSecs > 0) {
+      _timeLeft = snap.timeLeftSecs;
+      _timer?.cancel();
+      _timer = async.Timer.periodic(const Duration(seconds: 1), (_) {
+        if (_status != GameStatus.playing) {
+          _timer?.cancel();
+          _timer = null;
+          return;
+        }
+        _timeLeft--;
+        if (_timeLeft <= 0) {
+          _handleTimeout();
+        } else {
+          _notify();
+        }
+      });
+    }
+
+    _notify();
+
+    // Nếu đến lượt AI, trigger AI move ngay.
+    if (vsAI && _currentPlayer == 2 && _status == GameStatus.playing) {
+      async.Future.delayed(const Duration(milliseconds: 400), _doAIMove);
     }
   }
 
@@ -358,6 +510,15 @@ class CaroGame extends FlameGame with TapCallbacks {
     final duration = _gameStartTime != null
         ? DateTime.now().difference(_gameStartTime!).inSeconds
         : 0;
+    final List<MoveLog> moveLog = _moves
+        .map((MoveRecord m) => MoveLog(
+              row: m.row,
+              col: m.col,
+              player: m.player,
+              removedRow: m.removedRow,
+              removedCol: m.removedCol,
+            ))
+        .toList();
     await GameHistory().add(GameRecord(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       playedAt: DateTime.now(),
@@ -368,7 +529,17 @@ class CaroGame extends FlameGame with TapCallbacks {
       skinName: AppSettings().skin.name,
       boardSide: boardSize,
       winLength: winLength,
+      aiDifficultyIndex: vsAI ? AppSettings().aiDifficulty.index : -1,
+      moves: moveLog,
     ));
+    // US-003: Ván đã kết thúc → xóa snapshot đang dở (nếu có).
+    async.unawaited(GameSnapshotStore().clear());
+    // US-004: Evaluate achievements sau khi history đã update. Newly unlocked
+    // badges sẽ xuất hiện qua AchievementStore.newlyUnlockedQueue — GameScreen
+    // listen và show toast.
+    final Set<BadgeId> unlocked =
+        AchievementEngine.evaluate(GameHistory().records);
+    async.unawaited(AchievementStore().syncWithUnlocked(unlocked));
   }
 
   int get totalMoves => _totalMoves;
@@ -379,9 +550,6 @@ class CaroGame extends FlameGame with TapCallbacks {
 
   // ─── AI ────────────────────────────────────────────────────────────────────
 
-  static const int _aiWinTerminal = 1000000;
-  static const int _aiLoseTerminal = -1000000;
-
   Future<void> _doAIMove() async {
     if (_status != GameStatus.playing) return;
     if (_currentPlayer != 2) return;
@@ -390,34 +558,44 @@ class CaroGame extends FlameGame with TapCallbacks {
     final List<List<int>> snapshot =
         board.map((List<int> row) => List<int>.from(row)).toList();
     final AiDifficulty diff = AppSettings().aiDifficulty;
+    final AiMoveRequest req = AiMoveRequest(
+      board: snapshot,
+      boardSize: boardSize,
+      winLength: winLength,
+      difficultyIndex: diff.index,
+      randomSeed: _aiRandom.nextInt(1 << 30),
+      isSlidingCapRuleEnabled: _usesSlidingCapRule,
+      maxPiecesPerPlayer: boardSize * boardSize, // placeholder — AI dùng board fullness
+      orderP1: _serializeOrder(_pieceOrder[1]!),
+      orderP2: _serializeOrder(_pieceOrder[2]!),
+    );
+
+    List<int>? res;
     try {
-      final AiMoveRequest req = AiMoveRequest(
-        board: snapshot,
-        boardSize: boardSize,
-        winLength: winLength,
-        difficultyIndex: diff.index,
-        randomSeed: _aiRandom.nextInt(1 << 30),
-        isSlidingCapRuleEnabled: _usesSlidingCapRule,
-        maxPiecesPerPlayer: boardSize * boardSize, // không dùng nữa — AI dùng board fullness
-        orderP1: _serializeOrder(_pieceOrder[1]!),
-        orderP2: _serializeOrder(_pieceOrder[2]!),
-      );
-      final List<int>? res = await Isolate.run(() => AiEngine.pickMove(req));
-      if (res == null) return;
-      if (_status != GameStatus.playing) return;
-      if (_currentPlayer != 2) return;
-      if (requestId != _aiRequestId) return;
-      final int r = res[0];
-      final int c = res[1];
-      if (r < 0 || r >= boardSize || c < 0 || c >= boardSize) return;
-      if (board[r][c] != 0) return;
-      _placeMove(r, c);
+      final IsolateManager<List<int>?, AiMoveRequest> isolate =
+          await _ensureAiIsolate();
+      res = await isolate.compute(req);
     } catch (_) {
-      final (int, int)? move = _getAIMove();
-      if (move != null) {
-        _placeMove(move.$1, move.$2);
+      // Fallback: chạy AI ngay trên main isolate (blocking) thay vì bỏ nước đi.
+      // Trường hợp này hiếm (spawn isolate fail), nên accept hit nhỏ về UX
+      // hơn là để game đứng hình.
+      try {
+        res = AiEngine.pickMove(req);
+      } catch (_) {
+        res = null;
       }
     }
+
+    if (res == null) return;
+    // Kiểm tra lại state sau khi isolate trả về (user có thể đã reset/undo).
+    if (_status != GameStatus.playing) return;
+    if (_currentPlayer != 2) return;
+    if (requestId != _aiRequestId) return;
+    final int r = res[0];
+    final int c = res[1];
+    if (r < 0 || r >= boardSize || c < 0 || c >= boardSize) return;
+    if (board[r][c] != 0) return;
+    _placeMove(r, c);
   }
 
   static List<int> _serializeOrder(List<Point<int>> points) {
@@ -427,386 +605,6 @@ class CaroGame extends FlameGame with TapCallbacks {
       out.add(p.y);
     }
     return out;
-  }
-
-  (int, int)? _getAIMove() {
-    final List<(int, int)> candidates = _getCandidateMoves();
-    if (candidates.isEmpty) {
-      return null;
-    }
-    final AiDifficulty diff = AppSettings().aiDifficulty;
-    final (int, int)? winAi = _findImmediateWinningMove(2);
-    if (winAi != null) {
-      return winAi;
-    }
-    final (int, int)? winHuman = _findImmediateWinningMove(1);
-    if (winHuman != null) {
-      if (diff != AiDifficulty.low || _aiRandom.nextDouble() < 0.55) {
-        return winHuman;
-      }
-    }
-    if (diff == AiDifficulty.low) {
-      return candidates[_aiRandom.nextInt(candidates.length)];
-    }
-    if (diff == AiDifficulty.medium) {
-      return _bestMoveOnePly(candidates);
-    }
-    return _bestMoveDeepSearch(candidates, maxPly: _maxAiSearchPly());
-  }
-
-  int _maxAiSearchPly() {
-    final int cells = boardSize * boardSize;
-    if (cells <= 9) {
-      return 10;
-    }
-    if (cells <= 36) {
-      return 6;
-    }
-    return 4;
-  }
-
-  (int, int)? _findImmediateWinningMove(int player) {
-    for (final (int r, int c) in _getCandidateMoves()) {
-      board[r][c] = player;
-      final List<Point<int>>? w = _checkWin(r, c, player);
-      board[r][c] = 0;
-      if (w != null) {
-        return (r, c);
-      }
-    }
-    return null;
-  }
-
-  (int, int)? _bestMoveOnePly(List<(int, int)> candidates) {
-    int bestScore = -999999999;
-    (int, int)? bestMove;
-    for (final (int r, int c) in candidates) {
-      board[r][c] = 2;
-      final int score = _evaluateBoard();
-      board[r][c] = 0;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = (r, c);
-      }
-    }
-    return bestMove;
-  }
-
-  (int, int)? _bestMoveDeepSearch(List<(int, int)> candidates,
-      {required int maxPly}) {
-    int bestScore = -999999999;
-    (int, int)? bestMove;
-    int hash = _computeBoardHash();
-    final List<(int, int)> ordered = _orderMovesForAi(candidates);
-    for (final (int r, int c) in ordered) {
-      board[r][c] = 2;
-      hash = _applyHash(hash, r, c, 2);
-      final int score = -_negamax(
-        depth: 0,
-        maxDepth: maxPly,
-        alpha: -999999999,
-        beta: 999999999,
-        playerToMove: 1,
-        lastMoveRow: r,
-        lastMoveCol: c,
-        lastMovePlayer: 2,
-        hash: hash,
-      );
-      hash = _applyHash(hash, r, c, 2);
-      board[r][c] = 0;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = (r, c);
-      }
-    }
-    return bestMove;
-  }
-
-  int _negamax({
-    required int depth,
-    required int maxDepth,
-    required int alpha,
-    required int beta,
-    required int playerToMove,
-    required int lastMoveRow,
-    required int lastMoveCol,
-    required int lastMovePlayer,
-    required int hash,
-  }) {
-    if (_checkWin(lastMoveRow, lastMoveCol, lastMovePlayer) != null) {
-      return lastMovePlayer == 2
-          ? _aiWinTerminal - depth
-          : _aiLoseTerminal + depth;
-    }
-    if (depth >= maxDepth || _isBoardFull()) {
-      return _evaluateBoard();
-    }
-    final _TranspositionEntry? cached = _transposition[hash];
-    if (cached != null && cached.depth >= (maxDepth - depth)) {
-      if (cached.flag == _TtFlag.exact) {
-        return cached.score;
-      }
-      if (cached.flag == _TtFlag.lowerBound && cached.score > alpha) {
-        alpha = cached.score;
-      }
-      if (cached.flag == _TtFlag.upperBound && cached.score < beta) {
-        beta = cached.score;
-      }
-      if (alpha >= beta) {
-        return cached.score;
-      }
-    }
-    final int alphaOrig = alpha;
-    final List<(int, int)> moves = _topCandidateMovesForPlayer(
-      playerToMove,
-      limit: 14,
-    );
-    if (moves.isEmpty) {
-      return _evaluateBoard();
-    }
-    final List<(int, int)> ordered = playerToMove == 2
-        ? _orderMovesForAi(moves)
-        : _orderMovesForHuman(moves);
-    int best = -999999999;
-    int localHash = hash;
-    for (final (int r, int c) in ordered) {
-      board[r][c] = playerToMove;
-      localHash = _applyHash(localHash, r, c, playerToMove);
-      final int score = -_negamax(
-        depth: depth + 1,
-        maxDepth: maxDepth,
-        alpha: -beta,
-        beta: -alpha,
-        playerToMove: playerToMove == 2 ? 1 : 2,
-        lastMoveRow: r,
-        lastMoveCol: c,
-        lastMovePlayer: playerToMove,
-        hash: localHash,
-      );
-      localHash = _applyHash(localHash, r, c, playerToMove);
-      board[r][c] = 0;
-      if (score > best) {
-        best = score;
-      }
-      if (best > alpha) {
-        alpha = best;
-      }
-      if (alpha >= beta) {
-        break;
-      }
-    }
-    if (_transposition.length > _ttMaxEntries) {
-      _transposition.clear();
-    }
-    final _TtFlag flag;
-    if (best <= alphaOrig) {
-      flag = _TtFlag.upperBound;
-    } else if (best >= beta) {
-      flag = _TtFlag.lowerBound;
-    } else {
-      flag = _TtFlag.exact;
-    }
-    _transposition[hash] = _TranspositionEntry(
-      depth: maxDepth - depth,
-      score: best,
-      flag: flag,
-    );
-    return best;
-  }
-
-  List<(int, int)> _orderMovesForAi(List<(int, int)> moves) {
-    final List<({int score, (int, int) m})> scored =
-        <({int score, (int, int) m})>[];
-    for (final (int r, int c) in moves) {
-      scored.add((score: _scoreMoveHeuristic(r, c, 2), m: (r, c)));
-    }
-    scored.sort((a, b) => b.score.compareTo(a.score));
-    return scored.map((e) => e.m).toList();
-  }
-
-  List<(int, int)> _orderMovesForHuman(List<(int, int)> moves) {
-    final List<({int score, (int, int) m})> scored =
-        <({int score, (int, int) m})>[];
-    for (final (int r, int c) in moves) {
-      scored.add((score: _scoreMoveHeuristic(r, c, 1), m: (r, c)));
-    }
-    scored.sort((a, b) => b.score.compareTo(a.score));
-    return scored.map((e) => e.m).toList();
-  }
-
-  int _scoreMoveHeuristic(int r, int c, int player) {
-    int score = 0;
-    const dirs = [(0, 1), (1, 0), (1, 1), (1, -1)];
-    board[r][c] = player;
-    for (final d in dirs) {
-      score += _evaluateLine(r, c, d.$1, d.$2, player);
-    }
-    board[r][c] = 0;
-    return score;
-  }
-
-  static List<int> _buildZobristTable(int side, {required int seed}) {
-    final Random rnd = Random(seed);
-    final int cells = side * side;
-    final List<int> t = List<int>.filled(cells * 2, 0);
-    for (int i = 0; i < t.length; i++) {
-      final int hi = rnd.nextInt(1 << 30);
-      final int lo = rnd.nextInt(1 << 30);
-      t[i] = (hi << 32) ^ lo;
-    }
-    return t;
-  }
-
-  int _zIndex(int row, int col, int player) {
-    final int cell = row * boardSize + col;
-    return cell * 2 + (player - 1);
-  }
-
-  int _applyHash(int hash, int row, int col, int player) {
-    return hash ^ _zobristTable[_zIndex(row, col, player)];
-  }
-
-  int _computeBoardHash() {
-    int h = 0;
-    for (int r = 0; r < boardSize; r++) {
-      for (int c = 0; c < boardSize; c++) {
-        final int p = board[r][c];
-        if (p == 0) continue;
-        h = _applyHash(h, r, c, p);
-      }
-    }
-    return h;
-  }
-
-  List<(int, int)> _topCandidateMovesForPlayer(int forPlayer,
-      {required int limit}) {
-    final List<(int, int)> raw = _getCandidateMoves();
-    if (raw.length <= limit) {
-      return raw;
-    }
-    final List<({int score, (int, int) m})> scored = [];
-    for (final (int r, int c) in raw) {
-      board[r][c] = forPlayer;
-      final int s = _evaluateBoard();
-      board[r][c] = 0;
-      scored.add((score: s, m: (r, c)));
-    }
-    if (forPlayer == 2) {
-      scored.sort((a, b) => b.score.compareTo(a.score));
-    } else {
-      scored.sort((a, b) => a.score.compareTo(b.score));
-    }
-    return scored.take(limit).map((e) => e.m).toList();
-  }
-
-  int _evaluateBoard() {
-    int score = 0;
-    const dirs = [(0, 1), (1, 0), (1, 1), (1, -1)];
-    for (int r = 0; r < boardSize; r++) {
-      for (int c = 0; c < boardSize; c++) {
-        if (board[r][c] == 0) continue;
-        final p = board[r][c];
-        for (final d in dirs) {
-          final s = _evaluateLine(r, c, d.$1, d.$2, p);
-          score += p == 2 ? s : -s;
-        }
-      }
-    }
-    return score;
-  }
-
-  int _evaluateLine(int r, int c, int dr, int dc, int p) {
-    int count = 0;
-    int openEnds = 0;
-    int nr = r - dr;
-    int nc = c - dc;
-    if (nr >= 0 &&
-        nr < boardSize &&
-        nc >= 0 &&
-        nc < boardSize &&
-        board[nr][nc] == 0) {
-      openEnds++;
-    }
-    for (int i = 0; i < winLength; i++) {
-      nr = r + dr * i;
-      nc = c + dc * i;
-      if (nr < 0 || nr >= boardSize || nc < 0 || nc >= boardSize) {
-        break;
-      }
-      if (board[nr][nc] == p) {
-        count++;
-      } else {
-        break;
-      }
-    }
-    nr = r + dr * count;
-    nc = c + dc * count;
-    if (nr >= 0 &&
-        nr < boardSize &&
-        nc >= 0 &&
-        nc < boardSize &&
-        board[nr][nc] == 0) {
-      openEnds++;
-    }
-    if (count == 0) {
-      return 0;
-    }
-    final int w = winLength;
-    if (count >= w) {
-      return 10000;
-    }
-    if (count == w - 1) {
-      if (openEnds == 2) {
-        return 1000;
-      }
-      if (openEnds == 1) {
-        return 100;
-      }
-    }
-    if (w >= 4 && count == w - 2) {
-      if (openEnds == 2) {
-        return 100;
-      }
-      if (openEnds == 1) {
-        return 10;
-      }
-    }
-    if (w >= 5 && count == w - 3 && openEnds == 2) {
-      return 10;
-    }
-    if (count >= 2 && openEnds == 2) {
-      return 10;
-    }
-    if (count >= 2 && openEnds == 1) {
-      return 5;
-    }
-    return count;
-  }
-
-  List<(int, int)> _getCandidateMoves() {
-    final Set<(int, int)> result = {};
-    bool hasAny = false;
-    for (int r = 0; r < boardSize; r++) {
-      for (int col = 0; col < boardSize; col++) {
-        if (board[r][col] != 0) {
-          hasAny = true;
-          for (int dr = -2; dr <= 2; dr++) {
-            for (int dc = -2; dc <= 2; dc++) {
-              final nr = r + dr, nc = col + dc;
-              if (nr >= 0 &&
-                  nr < boardSize &&
-                  nc >= 0 &&
-                  nc < boardSize &&
-                  board[nr][nc] == 0) {
-                result.add((nr, nc));
-              }
-            }
-          }
-        }
-      }
-    }
-    if (!hasAny) return [(boardSize ~/ 2, boardSize ~/ 2)];
-    return result.toList();
   }
 
   bool _isBoardFull() {
@@ -844,18 +642,4 @@ class CaroGame extends FlameGame with TapCallbacks {
     }
     return null;
   }
-}
-
-enum _TtFlag { exact, lowerBound, upperBound }
-
-class _TranspositionEntry {
-  final int depth;
-  final int score;
-  final _TtFlag flag;
-
-  const _TranspositionEntry({
-    required this.depth,
-    required this.score,
-    required this.flag,
-  });
 }

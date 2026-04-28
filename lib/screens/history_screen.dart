@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../core/game_history.dart';
 import '../core/l10n.dart';
 import '../core/text_app_style.dart';
+import 'replay_screen.dart';
+import 'statistics_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -53,7 +55,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                   ),
-                  if (records.isNotEmpty)
+                  if (records.isNotEmpty) ...<Widget>[
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const StatisticsScreen(),
+                        ),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15)),
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
+                        child: const Icon(Icons.bar_chart_rounded,
+                            color: Colors.white, size: 18),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     GestureDetector(
                       onTap: _confirmClear,
                       child: Container(
@@ -74,6 +95,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -248,7 +270,7 @@ class _RecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final Widget card = Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -301,15 +323,38 @@ class _RecordCard extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            _formatDate(record.playedAt),
-            style: TextAppStyle.sfProWithCjkFallback(
-              color: Colors.white.withValues(alpha: 0.25),
-              fontSize: 10,
+          if (record.canReplay) ...<Widget>[
+            const SizedBox(width: 8),
+            Icon(
+              Icons.play_circle_rounded,
+              color: _resultColor.withValues(alpha: 0.8),
+              size: 24,
             ),
-          ),
+            const SizedBox(width: 4),
+          ] else
+            Text(
+              _formatDate(record.playedAt),
+              style: TextAppStyle.sfProWithCjkFallback(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 10,
+              ),
+            ),
         ],
       ),
+    );
+
+    if (!record.canReplay) return card;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ReplayScreen(record: record),
+          ),
+        );
+      },
+      child: card,
     );
   }
 }

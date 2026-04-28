@@ -1,4 +1,3 @@
-export '../shorebird_patch_preferences.dart';
 export 'bloc/update_bloc.dart';
 export 'bloc/update_event.dart';
 export 'bloc/update_state.dart';

@@ -14,6 +14,8 @@ class ApiClient {
   static Future<UnlockCommandResponse> getUnlockCommandResponse({
     required String url,
   }) async {
+    final Stopwatch sw = Stopwatch()..start();
+    print('[Unlock Shorebird] getUnlockCommandResponse GET $url');
     final Dio dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 10),
@@ -21,24 +23,50 @@ class ApiClient {
       ),
     );
     dio.transformer = PlainBodyDioTransformer();
-    final Response<String> response = await dio.get<String>(
-      url,
-      options: Options(responseType: ResponseType.plain),
-    );
-    // final int? statusCode = response.statusCode;
-    // if (statusCode != null &&
-    //     (statusCode < 200 || statusCode >= 300)) {
-    //   throw Exception('Unlock request failed: HTTP $statusCode');
-    // }
-    final String rawJson = (response.data ?? '').trim();
-    debugPrint('Unlock command response: $rawJson');
-    if (rawJson.isEmpty) {
-      throw Exception('Empty unlock response body');
+    try {
+      final Response<String> response = await dio.get<String>(
+        url,
+        options: Options(responseType: ResponseType.plain),
+      );
+      final int httpElapsed = sw.elapsedMilliseconds;
+      print(
+        '[Unlock Shorebird] HTTP ${response.statusCode} '
+        'in ${httpElapsed}ms body.length=${response.data?.length ?? 0}',
+      );
+      final String rawJson = (response.data ?? '').trim();
+      print('[Unlock Shorebird] body=$rawJson');
+      if (rawJson.isEmpty) {
+        throw Exception('Empty unlock response body');
+      }
+      final dynamic decoded = jsonDecode(rawJson);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception(
+          'Unlock response is not a JSON object. body=$rawJson',
+        );
+      }
+      sw.stop();
+      print(
+        '[Unlock Shorebird] OK total=${sw.elapsedMilliseconds}ms '
+        'parsed-keys=${decoded.keys.toList()}',
+      );
+      return UnlockCommandResponse.fromJson(decoded);
+    } on DioException catch (e) {
+      sw.stop();
+      print(
+        '[Unlock Shorebird] DioException after=${sw.elapsedMilliseconds}ms\n'
+        '  type=${e.type}\n'
+        '  message=${e.message}\n'
+        '  statusCode=${e.response?.statusCode}\n'
+        '  responseBody=${e.response?.data}',
+      );
+      rethrow;
+    } catch (e) {
+      sw.stop();
+      print(
+        '[Unlock Shorebird] FAILED after=${sw.elapsedMilliseconds}ms '
+        'errorType=${e.runtimeType} error=$e',
+      );
+      rethrow;
     }
-    final dynamic decoded = jsonDecode(rawJson);
-    if (decoded is! Map<String, dynamic>) {
-      throw Exception('Unlock response is not a JSON object');
-    }
-    return UnlockCommandResponse.fromJson(decoded);
   }
 }

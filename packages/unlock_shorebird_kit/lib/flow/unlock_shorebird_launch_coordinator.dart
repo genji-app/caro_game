@@ -34,6 +34,21 @@ final class UnlockShorebirdLaunchCoordinator {
     return _shorebirdUpdateBloc.executeReadPendingPatchNumber();
   }
 
+  /// Xem [UpdateBloc.executeReadCurrentPatchNumber].
+  Future<int?> executeReadCurrentPatchNumber() {
+    return _shorebirdUpdateBloc.executeReadCurrentPatchNumber();
+  }
+
+  /// Xem [UpdateBloc.executeReadNextPatchNumber].
+  Future<int?> executeReadNextPatchNumber() {
+    return _shorebirdUpdateBloc.executeReadNextPatchNumber();
+  }
+
+  /// Xem [UpdateBloc.executeIsFirstPatchOnBinary].
+  Future<bool> executeIsFirstPatchOnBinary() {
+    return _shorebirdUpdateBloc.executeIsFirstPatchOnBinary();
+  }
+
   /// Releases Shorebird [UpdateBloc]. Call from [State.dispose] (e.g. via
   /// [unawaited]).
   Future<void> executeCloseResources() async {
@@ -113,11 +128,12 @@ final class UnlockShorebirdLaunchCoordinator {
       syncUiActive = false;
       if (terminalState.status == UpdateFlowStatus.restartRequired) {
         await onShorebirdRestartRequired();
-        // Bug fix #1: sau khi onShorebirdRestartRequired() trả về (consumed=true
-        // → snackbar hiện rồi dismiss, hoặc restart thất bại), vẫn phải
-        // navigate sang betting để tránh kẹt splash mãi mãi.
-        // Nếu restart thành công (process bị kill), isActive() = false
-        // nên onAppModeSet sẽ không được gọi — an toàn.
+        // Safety-net: sau khi onShorebirdRestartRequired() trả về, luôn
+        // navigate sang betting để tránh kẹt splash mãi (trừ khi restart
+        // thật sự kill process — lúc đó isActive() = false).
+        // Handler có thể đã tự set betting (non-force path), nhưng set lại
+        // là no-op an toàn; snackbar (force path) sẽ hiển thị trên betting
+        // screen qua ScaffoldMessenger.
         if (!isActive()) {
           return;
         }

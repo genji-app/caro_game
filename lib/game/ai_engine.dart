@@ -1,5 +1,12 @@
 import 'dart:math';
 
+/// Top-level entry point used by `IsolateManager` to run the AI move
+/// computation inside a long-lived background isolate. Must be a top-level
+/// (not method) function. `@pragma('vm:entry-point')` prevents tree-shaking
+/// from stripping the symbol in release builds.
+@pragma('vm:entry-point')
+List<int>? aiPickMoveWorker(AiMoveRequest req) => AiEngine.pickMove(req);
+
 // ─── Threat score constants (calibrated for gomoku / caro) ───────────────────
 //
 // The hierarchy reflects standard gomoku theory:

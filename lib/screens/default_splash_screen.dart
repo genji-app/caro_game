@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class DefaultSplashScreen extends StatelessWidget {
@@ -8,7 +9,10 @@ class DefaultSplashScreen extends StatelessWidget {
     return const Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: CircularProgressIndicator(),
+        child: CupertinoActivityIndicator(
+          radius: 16,
+          color: Colors.white,
+        ),
       ),
     );
   }

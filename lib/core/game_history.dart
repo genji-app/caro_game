@@ -4,6 +4,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum GameResult { xWins, oWins, draw, timeout }
 enum GameMode { twoPlayers, vsAI }
 
+/// Thông tin 1 nước đi được lưu vào lịch sử để replay lại game.
+///
+/// [removedRow]/[removedCol] chỉ có giá trị khi áp dụng luật sliding-cap
+/// (board 3x3 / 4x4) và nước đi này đã đẩy 1 quân cũ ra khỏi bàn.
+class MoveLog {
+  final int row;
+  final int col;
+  final int player;
+  final int? removedRow;
+  final int? removedCol;
+
+  const MoveLog({
+    required this.row,
+    required this.col,
+    required this.player,
+    this.removedRow,
+    this.removedCol,
+  });
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'r': row,
+        'c': col,
+        'p': player,
+        if (removedRow != null) 'rr': removedRow,
+        if (removedCol != null) 'rc': removedCol,
+      };
+
+  factory MoveLog.fromJson(Map<String, dynamic> json) => MoveLog(
+        row: json['r'] as int,
+        col: json['c'] as int,
+        player: json['p'] as int,
+        removedRow: json['rr'] as int?,
+        removedCol: json['rc'] as int?,
+      );
+}
+
 class GameRecord {
   final String id;
   final DateTime playedAt;
@@ -15,6 +51,13 @@ class GameRecord {
   final int boardSide;
   final int winLength;
 
+  /// Index của [AiDifficulty] khi [mode] là vsAI. -1 khi không dùng (PvP).
+  final int aiDifficultyIndex;
+
+  /// Danh sách nước đi theo thứ tự — dùng để replay. Rỗng với record cũ
+  /// được tạo trước khi tính năng replay ra đời → replay button sẽ ẩn đi.
+  final List<MoveLog> moves;
+
   GameRecord({
     required this.id,
     required this.playedAt,
@@ -25,31 +68,42 @@ class GameRecord {
     required this.skinName,
     required this.boardSide,
     required this.winLength,
+    this.aiDifficultyIndex = -1,
+    this.moves = const <MoveLog>[],
   });
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'playedAt': playedAt.toIso8601String(),
-    'mode': mode.index,
-    'result': result.index,
-    'totalMoves': totalMoves,
-    'durationSecs': durationSecs,
-    'skinName': skinName,
-    'boardSide': boardSide,
-    'winLength': winLength,
-  };
+  bool get canReplay => moves.isNotEmpty;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'playedAt': playedAt.toIso8601String(),
+        'mode': mode.index,
+        'result': result.index,
+        'totalMoves': totalMoves,
+        'durationSecs': durationSecs,
+        'skinName': skinName,
+        'boardSide': boardSide,
+        'winLength': winLength,
+        'aiDifficultyIndex': aiDifficultyIndex,
+        'moves': moves.map((MoveLog m) => m.toJson()).toList(),
+      };
 
   factory GameRecord.fromJson(Map<String, dynamic> json) => GameRecord(
-    id: json['id'],
-    playedAt: DateTime.parse(json['playedAt']),
-    mode: GameMode.values[json['mode']],
-    result: GameResult.values[json['result']],
-    totalMoves: json['totalMoves'],
-    durationSecs: json['durationSecs'],
-    skinName: json['skinName'] ?? 'neon',
-    boardSide: json['boardSide'] ?? 15,
-    winLength: json['winLength'] ?? 5,
-  );
+        id: json['id'] as String,
+        playedAt: DateTime.parse(json['playedAt'] as String),
+        mode: GameMode.values[json['mode'] as int],
+        result: GameResult.values[json['result'] as int],
+        totalMoves: json['totalMoves'] as int,
+        durationSecs: json['durationSecs'] as int,
+        skinName: (json['skinName'] as String?) ?? 'neon',
+        boardSide: (json['boardSide'] as int?) ?? 15,
+        winLength: (json['winLength'] as int?) ?? 5,
+        aiDifficultyIndex: (json['aiDifficultyIndex'] as int?) ?? -1,
+        moves: (json['moves'] as List<dynamic>?)
+                ?.map((dynamic e) => MoveLog.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            const <MoveLog>[],
+      );
 
   String get durationText {
     final m = durationSecs ~/ 60;

@@ -1,0 +1,13 @@
+# Template for release signing. Copy this to `android/key.properties` (SAME folder)
+# and fill with real values. The `key.properties` file MUST NOT be committed to git.
+#
+# Tạo keystore nếu chưa có:
+#   keytool -genkey -v -keystore ~/caro-release.jks -storetype JKS \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias caro-release
+#
+# Sau đó điền các giá trị tương ứng bên dưới:
+
+storePassword=<mật khẩu keystore>
+keyPassword=<mật khẩu key alias>
+keyAlias=caro-release
+storeFile=/Users/<user>/caro-release.jks

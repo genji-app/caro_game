@@ -1,7 +1,7 @@
 name: co_caro_flame
 description: Cờ Caro game using Flutter Flame engine - Full Featured
 publish_to: 'none'
-version: 1.0.2+3
+version: 1.0.7+1
 
 environment:
   sdk: '>=3.9.2 <4.0.0'
@@ -15,79 +15,83 @@ dependencies:
   flutter_animate: ^4.5.0
   terminate_restart: ^1.1.0
   package_info_plus: ^8.0.3
+  shorebird_code_push: ^2.0.5
   unlock_shorebird_kit:
     path: packages/unlock_shorebird_kit
 
-  # S88 - State Management
-  flutter_riverpod: ^2.5.1
-  riverpod: ^2.5.1
-
-  # S88 - Model
-  freezed_annotation: ^3.1.0
-  json_annotation: ^4.9.0
-
-  # S88 - Utils
-  cupertino_icons: ^1.0.8
+  # Share sheet (export result + board snapshot as image)
+  share_plus: ^10.1.2
   google_fonts: ^6.2.1
-  dartz: ^0.10.1
-  crypto: ^3.0.3
-  uuid: ^4.2.1
-  device_info_plus: ^9.1.0
-  web: ^1.1.1
-  path_provider: ^2.1.0
-  isolate_manager: ^6.1.2
-  jwt_decoder: ^2.0.1
-  intl: ^0.20.2
-  gap: ^3.0.1
-  styled_text: ^8.1.0
-  pinput: ^6.0.1
-  shimmer_animation: ^2.1.0
-  grouped_list: ^6.0.0
-
-  # S88 - Networking
-  http: ^1.1.0
-  dio: ^5.7.0
-  connectivity_plus: ^6.1.0
-  pretty_dio_logger: ^1.4.0
-  shared_preferences: ^2.2.3
-  web_socket_channel: ^3.0.0
-  protobuf: ^6.0.0
-  fixnum: ^1.1.0
-
-  # S88 - Routing
-  go_router: ^13.2.4
-
-  # S88 - Logging & UI
-  logger: ^2.4.0
-  flutter_svg: ^2.2.2
-  cached_network_image: ^3.4.1
-  carousel_slider: ^5.1.1
+  audioplayers: ^6.5.1
   rive: ^0.14.1
   url_launcher: ^6.2.5
 
-  # S88 - Media
-  audioplayers: ^6.5.1
-  webview_flutter: ^4.11.2
-  webview_flutter_wkwebview: ^3.23.7
-  webview_flutter_android: ^4.0.0
-
-  # S88 - Storage
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-
-  # S88 - Local packages
-  game_api_client:
-    path: packages/game_api_client
-  sport_socket:
-    path: packages/sport_socket
-  adaptive_overlay:
-    path: packages/adaptive_overlay
-  orientation_guard:
-    path: packages/orientation_guard
-  flutter_slider_drawer:
-    path: packages/flutter_slider_drawer
-  game_engine:
-    path: packages/game_engine
+#  # S88 - State Management
+#  flutter_riverpod: ^2.5.1
+#  riverpod: ^2.5.1
+#
+#  # S88 - Model
+#  freezed_annotation: ^3.1.0
+#  json_annotation: ^4.9.0
+#
+#  # S88 - Utils
+#  cupertino_icons: ^1.0.8
+#
+#  dartz: ^0.10.1
+#  crypto: ^3.0.3
+#  uuid: ^4.2.1
+#  device_info_plus: ^9.1.0
+#  web: ^1.1.1
+#  path_provider: ^2.1.0
+#  isolate_manager: ^6.1.2
+#  jwt_decoder: ^2.0.1
+#  intl: ^0.20.2
+#  gap: ^3.0.1
+#  styled_text: ^8.1.0
+#  pinput: ^6.0.1
+#  shimmer_animation: ^2.1.0
+#  grouped_list: ^6.0.0
+#
+#  # S88 - Networking
+#  http: ^1.1.0
+#  dio: ^5.7.0
+#  connectivity_plus: ^6.1.0
+#  pretty_dio_logger: ^1.4.0
+#  shared_preferences: ^2.2.3
+#  web_socket_channel: ^3.0.0
+#  protobuf: ^6.0.0
+#  fixnum: ^1.1.0
+#
+#  # S88 - Routing
+#  go_router: ^13.2.4
+#
+#  # S88 - Logging & UI
+#  logger: ^2.4.0
+#  flutter_svg: ^2.2.2
+#  cached_network_image: ^3.4.1
+#  carousel_slider: ^5.1.1
+#
+#  webview_flutter: ^4.11.2
+#  webview_flutter_wkwebview: ^3.23.7
+#  webview_flutter_android: ^4.0.0
+#
+#  # S88 - Storage
+#  hive: ^2.2.3
+#  hive_flutter: ^1.1.0
+#
+#  # S88 - Local packages
+#  game_api_client:
+#    path: packages/game_api_client
+#  sport_socket:
+#    path: packages/sport_socket
+#  adaptive_overlay:
+#    path: packages/adaptive_overlay
+#  orientation_guard:
+#    path: packages/orientation_guard
+#  flutter_slider_drawer:
+#    path: packages/flutter_slider_drawer
+#  game_engine:
+#    path: packages/game_engine
 
 dev_dependencies:
   flutter_test:

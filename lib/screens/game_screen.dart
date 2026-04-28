@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flame/game.dart';
+import '../core/achievements.dart';
 import '../core/app_settings.dart';
 import '../core/audio_service.dart';
 import '../core/l10n.dart';
@@ -23,16 +24,129 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _showingResult = false;
+  bool _processingBadgeQueue = false;
 
   @override
   void initState() {
     super.initState();
     widget.game.gameStateNotifier.addListener(_onGameStateChanged);
+    AchievementStore().newlyUnlockedQueue.addListener(_onBadgeQueueChanged);
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AudioService().startMatchAmbience();
     });
+  }
+
+  /// US-004: show toast khi có badge mới. Queue pattern — 1 toast/lần,
+  /// 1.5s giữa các toast để user có thể đọc từng cái.
+  Future<void> _onBadgeQueueChanged() async {
+    if (_processingBadgeQueue) return;
+    _processingBadgeQueue = true;
+    try {
+      while (mounted) {
+        final List<BadgeId> q = AchievementStore().newlyUnlockedQueue.value;
+        if (q.isEmpty) break;
+        final BadgeId id = q.first;
+        _showBadgeToast(id);
+        AchievementStore().popFromQueue(id);
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+      }
+    } finally {
+      _processingBadgeQueue = false;
+    }
+  }
+
+  void _showBadgeToast(BadgeId id) {
+    if (!mounted) return;
+    final BadgeDef def = BadgeCatalog.def(id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(milliseconds: 1400),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        margin: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+        content: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              colors: [
+                def.tierColor.withValues(alpha: 0.25),
+                const Color(0xFF1a1a3e).withValues(alpha: 0.95),
+              ],
+            ),
+            border: Border.all(color: def.tierColor.withValues(alpha: 0.6)),
+            boxShadow: [
+              BoxShadow(
+                color: def.tierColor.withValues(alpha: 0.4),
+                blurRadius: 16,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      def.tierColor.withValues(alpha: 0.4),
+                      def.tierColor.withValues(alpha: 0.05),
+                    ],
+                  ),
+                  border: Border.all(color: def.tierColor, width: 2),
+                ),
+                child: Icon(def.icon, color: def.tierColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l10n.badgeUnlockedTitle,
+                      style: TextAppStyle.ui(
+                        fontSize: 11,
+                        color: def.tierColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      l10n.get('${def.l10nKey}_name'),
+                      style: TextAppStyle.ui(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // US-003: khi app vào background/sắp kill, flush snapshot ngay để user
+    // có thể resume ở lần mở sau.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      widget.game.flushSnapshot();
+    }
   }
 
   void _onGameStateChanged() {
@@ -82,6 +196,8 @@ class _GameScreenState extends State<GameScreen> {
         vsAI: widget.vsAI,
         totalMoves: widget.game.totalMoves,
         durationSecs: widget.game.gameDurationSecs,
+        boardSide: widget.game.boardSize,
+        winLength: widget.game.winLength,
         onPlayAgain: () {
           Navigator.pop(context);
           if (mounted) setState(() => _showingResult = false);
@@ -98,9 +214,15 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void dispose() {
     widget.game.gameStateNotifier.removeListener(_onGameStateChanged);
+    AchievementStore().newlyUnlockedQueue.removeListener(_onBadgeQueueChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    // Flush snapshot lần cuối nếu user navigate back (không kill app).
+    // Nếu ván đã kết thúc, clear trong _saveHistory đã chạy, flush là no-op.
+    widget.game.flushSnapshot();
     AudioService().stopMatchAmbience();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {
