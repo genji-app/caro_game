@@ -27,6 +27,8 @@ import 'dart:async';
 // import 'package:co_caro_flame/s88/features/search/data/storage/search_recent_storage.dart';
 // import 'package:co_caro_flame/s88/shared/widgets/orientation/app_orientation_orchestrator.dart';
 // import 'package:co_caro_flame/s88/shared/widgets/splash/splash_screen.dart';
+import 'package:co_caro_flame/core/restart_scope.dart';
+import 'package:co_caro_flame/screens/default_splash_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,16 +38,11 @@ import 'package:flutter/services.dart';
 // import 'package:sport_socket/sport_socket.dart' as socket;
 import 'package:terminate_restart/terminate_restart.dart';
 import 'package:unlock_shorebird_kit/unlock_shorebird_kit.dart';
-import 'core/app_settings.dart';
-import 'core/audio_service.dart';
-import 'core/restart_scope.dart';
 import 'core/text_app_style.dart';
-import 'screens/default_splash_screen.dart';
+
 import 'screens/splash_screen.dart';
 
 Future<void> _bootstrap() async {
-  await AppSettings().load();
-  await AudioService().init();
   TextAppStyle.precacheMultilingualFonts();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
@@ -89,7 +86,7 @@ void main() async {
   await _bootstrap();
 
   runApp(
-    const CaroApp()
+    const CaroApp(),
     // ProviderScope(
     //   overrides: [systemUiProvider.overrideWithValue(systemUi)],
     //   child: const CaroApp(),
@@ -274,20 +271,20 @@ class _CaroAppState extends State<CaroApp> with WidgetsBindingObserver {
         ),
         home: SplashModeScreen(
           bettingScreenBuilder: () => const SplashScreen(),
-            //   buildBaseApp(
-            // _GamePreloadTrigger(
-            //   child: MaterialApp.router(
-            //     debugShowCheckedModeBanner: false,
-            //     theme: lightTheme,
-            //     darkTheme: darkTheme,
-            //     builder: (context, child) => NetworkManagerListener(
-            //       navigatorKey: _navigatorKey,
-            //       onReconnected: null,
-            //       child: child ?? const SizedBox.shrink(),
-            //     ),
-            //     routerConfig: _goRouter,
-            //   ),
-            // ),
+          //   buildBaseApp(
+          // _GamePreloadTrigger(
+          //   child: MaterialApp.router(
+          //     debugShowCheckedModeBanner: false,
+          //     theme: lightTheme,
+          //     darkTheme: darkTheme,
+          //     builder: (context, child) => NetworkManagerListener(
+          //       navigatorKey: _navigatorKey,
+          //       onReconnected: null,
+          //       child: child ?? const SizedBox.shrink(),
+          //     ),
+          //     routerConfig: _goRouter,
+          //   ),
+          // ),
           // ),
           fakeScreenBuilder: () => const SplashScreen(),
           executeRestartWithFade: RestartScope.executeRestartApp,

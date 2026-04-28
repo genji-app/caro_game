@@ -1,12 +1,6 @@
 import 'dart:math';
+import 'package:co_caro_flame/core/text_app_style.dart';
 import 'package:flutter/material.dart';
-import '../core/achievements.dart';
-import '../core/app_settings.dart';
-import '../core/text_app_style.dart';
-import '../core/l10n.dart';
-import '../core/game_history.dart';
-import 'home_screen.dart';
-import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,46 +40,22 @@ class _SplashScreenState extends State<SplashScreen>
     )..repeat(reverse: true);
 
     _titleFade = CurvedAnimation(parent: _titleCtrl, curve: Curves.easeOut);
-    _titleSlide = Tween(begin: 60.0, end: 0.0).animate(
-      CurvedAnimation(parent: _titleCtrl, curve: Curves.easeOutCubic),
-    );
+    _titleSlide = Tween(
+      begin: 60.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _titleCtrl, curve: Curves.easeOutCubic));
     _glow = CurvedAnimation(parent: _glowCtrl, curve: Curves.easeInOut);
 
     _init();
   }
 
   Future<void> _init() async {
-    await Future.wait([
-      AppSettings().load(),
-      GameHistory().load(),
-      AchievementStore().load(), // US-004
-    ]);
-
-    l10n.setLanguage(AppSettings().language);
-
     // Start title animation after short delay
     await Future.delayed(const Duration(milliseconds: 400));
     _titleCtrl.forward();
 
     // Navigate after 3.2s
-    await Future.delayed(const Duration(milliseconds: 2800));
-    if (mounted) {
-      setState(() => _ready = true);
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (mounted) {
-        final bool seen = AppSettings().hasSeenOnboarding;
-        Navigator.pushReplacement(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (_, __, ___) =>
-                seen ? const HomeScreen() : const OnboardingScreen(),
-            transitionsBuilder: (_, anim, __, child) =>
-                FadeTransition(opacity: anim, child: child),
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
-      }
-    }
+    await Future.delayed(const Duration(milliseconds: 10000));
   }
 
   @override
@@ -144,10 +114,11 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Opacity(
                         opacity: (_titleFade.value - 0.3).clamp(0.0, 1.0),
                         child: Text(
-                          l10n.tagline,
+                          'CARO CLASSIC',
                           style: TextAppStyle.rajdhani(
-                            color:
-                                const Color(0xFF4fc3f7).withValues(alpha: 0.5),
+                            color: const Color(
+                              0xFF4fc3f7,
+                            ).withValues(alpha: 0.5),
                             fontSize: 14,
                             letterSpacing: 8,
                             fontWeight: FontWeight.w500,
@@ -199,14 +170,18 @@ class _LogoIcon extends StatelessWidget {
             gradient: RadialGradient(
               colors: [
                 Color.lerp(
-                    const Color(0xFF1565c0), const Color(0xFF4fc3f7), glow)!,
+                  const Color(0xFF1565c0),
+                  const Color(0xFF4fc3f7),
+                  glow,
+                )!,
                 const Color(0xFF0d1b4d),
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color:
-                    const Color(0xFF4fc3f7).withValues(alpha: 0.3 + glow * 0.3),
+                color: const Color(
+                  0xFF4fc3f7,
+                ).withValues(alpha: 0.3 + glow * 0.3),
                 blurRadius: 30 + glow * 20,
                 spreadRadius: 5 + glow * 5,
               ),
@@ -308,8 +283,11 @@ class _WaveTitle extends StatelessWidget {
   final double progress;
   final double glow;
 
-  const _WaveTitle(
-      {required this.text, required this.progress, required this.glow});
+  const _WaveTitle({
+    required this.text,
+    required this.progress,
+    required this.glow,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -332,9 +310,15 @@ class _WaveTitle extends StatelessWidget {
                 shaderCallback: (bounds) => LinearGradient(
                   colors: [
                     Color.lerp(
-                        const Color(0xFF4fc3f7), Colors.white, glow * 0.3)!,
-                    Color.lerp(const Color(0xFF81d4fa), const Color(0xFFb3e5fc),
-                        glow * 0.2)!,
+                      const Color(0xFF4fc3f7),
+                      Colors.white,
+                      glow * 0.3,
+                    )!,
+                    Color.lerp(
+                      const Color(0xFF81d4fa),
+                      const Color(0xFFb3e5fc),
+                      glow * 0.2,
+                    )!,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -346,8 +330,9 @@ class _WaveTitle extends StatelessWidget {
                     color: Colors.white,
                     shadows: [
                       Shadow(
-                        color: const Color(0xFF4fc3f7)
-                            .withValues(alpha: 0.5 + glow * 0.3),
+                        color: const Color(
+                          0xFF4fc3f7,
+                        ).withValues(alpha: 0.5 + glow * 0.3),
                         blurRadius: 15 + glow * 10,
                       ),
                     ],
@@ -421,13 +406,34 @@ class _WaveCustomPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     _drawWave(canvas, size, progress, const Color(0xFF4fc3f7), 0.06, 30, 60);
     _drawWave(
-        canvas, size, progress + 0.3, const Color(0xFF1565c0), 0.04, 20, 40);
+      canvas,
+      size,
+      progress + 0.3,
+      const Color(0xFF1565c0),
+      0.04,
+      20,
+      40,
+    );
     _drawWave(
-        canvas, size, progress + 0.6, const Color(0xFFf48fb1), 0.03, 15, 80);
+      canvas,
+      size,
+      progress + 0.6,
+      const Color(0xFFf48fb1),
+      0.03,
+      15,
+      80,
+    );
   }
 
-  void _drawWave(Canvas canvas, Size size, double phase, Color color,
-      double opacity, double amplitude, double yOffset) {
+  void _drawWave(
+    Canvas canvas,
+    Size size,
+    double phase,
+    Color color,
+    double opacity,
+    double amplitude,
+    double yOffset,
+  ) {
     final paint = Paint()
       ..color = color.withValues(alpha: opacity)
       ..style = PaintingStyle.fill;
@@ -436,7 +442,8 @@ class _WaveCustomPainter extends CustomPainter {
     path.moveTo(0, size.height);
 
     for (double x = 0; x <= size.width; x++) {
-      final y = yOffset +
+      final y =
+          yOffset +
           sin((x / size.width * 2 * pi) + phase * 2 * pi) * amplitude +
           sin((x / size.width * 4 * pi) + phase * 2 * pi * 1.5) *
               amplitude *
@@ -466,7 +473,9 @@ class _StarfieldBg extends StatelessWidget {
         stars: List.generate(
           60,
           (_) => Offset(
-              rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+            rng.nextDouble() * size.width,
+            rng.nextDouble() * size.height,
+          ),
         ),
         sizes: List.generate(60, (_) => rng.nextDouble() * 2 + 0.5),
       ),

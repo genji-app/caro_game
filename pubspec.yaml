@@ -1,7 +1,7 @@
 name: co_caro_flame
 description: Cờ Caro game using Flutter Flame engine - Full Featured
 publish_to: 'none'
-version: 1.0.7+1
+version: 1.0.7+2
 
 environment:
   sdk: '>=3.9.2 <4.0.0'
@@ -123,6 +123,5 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - assets/sounds/
-    - assets/images/
+    - assets/icon_logo.png
     - shorebird.yaml
