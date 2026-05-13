@@ -58,8 +58,8 @@ class ShellMobileHeader extends ConsumerWidget implements PreferredSizeWidget {
               children: [
                 // Left: Logo
                 SizedBox(
-                  child: ImageHelper.getNetworkImage(
-                    imageUrl: AppImages.logoS88Home,
+                  child: ImageHelper.load(
+                    path: AppImages.logoS88Home,
                     width: 60,
                     height: 56,
                     fit: BoxFit.contain,

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:co_caro_flame/s88/core/services/models/api_v2/event_model_v2.dart';
 import 'package:co_caro_flame/s88/core/services/models/api_v2/league_model_v2.dart';
 import 'package:co_caro_flame/s88/core/services/network/sb_http_manager.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
+import 'package:caxilo_repository/caxilo_repository.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 import 'package:co_caro_flame/s88/features/search/data/datasources/search_remote_datasource.dart';
 import 'package:co_caro_flame/s88/features/search/data/datasources/search_remote_datasource_impl.dart';
@@ -183,10 +183,10 @@ final casinoRecentGameBlocksProvider = Provider.autoDispose<List<GameBlock>>((
   );
 });
 
-/// 5 game Sunwin đầu tiên (Phổ biến) từ GameRepository.
+/// 5 game Sunwin đầu tiên (Phổ biến) từ CaxiloRepository.
 final casinoPopularGamesProvider = FutureProvider.autoDispose<List<GameBlock>>((
   ref,
 ) {
-  final repository = ref.watch(gameRepositoryProvider);
+  final repository = ref.watch(caxiloRepositoryProvider);
   return repository.getPopularGames();
 });

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
+import 'package:caxilo_repository/caxilo_repository.dart';
 import 'package:co_caro_flame/s88/features/game/list/game_card.dart';
 
 /// Danh sách kết quả tìm kiếm casino (grid với khoảng cách giữa các ô).

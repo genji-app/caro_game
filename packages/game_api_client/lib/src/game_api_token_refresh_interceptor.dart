@@ -49,16 +49,10 @@ class GameApiTokenRefreshInterceptor extends Interceptor {
   /// Key to mark requests as retry to prevent infinite loop
   static const String _retryKey = '_token_refresh_retry';
 
-  GameApiTokenRefreshInterceptor({
-    required this.onRefreshToken,
-    required Dio dio,
-  }) : _dio = dio;
+  GameApiTokenRefreshInterceptor({required this.onRefreshToken, required Dio dio}) : _dio = dio;
 
   @override
-  void onResponse(
-    Response<dynamic> response,
-    ResponseInterceptorHandler handler,
-  ) {
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
     // Only process JSON responses
     if (response.data is! Map<String, dynamic>) {
       return handler.next(response);
@@ -154,20 +148,14 @@ class GameApiTokenRefreshInterceptor extends Interceptor {
       }
 
       // Token refreshed successfully - retry original request
-      final retryResponse = await _retryRequest(
-        response.requestOptions,
-        newToken,
-      );
+      final retryResponse = await _retryRequest(response.requestOptions, newToken);
       handler.resolve(retryResponse);
 
       // Retry all queued requests
       await _retryAllPendingRequests(newToken);
     } catch (e) {
       // Refresh failed with exception
-      final gameException = GameApiException(
-        message: 'Token refresh failed: $e',
-        originalError: e,
-      );
+      final gameException = GameApiException(message: 'Token refresh failed: $e', originalError: e);
 
       final error = DioException(
         requestOptions: response.requestOptions,
@@ -189,10 +177,7 @@ class GameApiTokenRefreshInterceptor extends Interceptor {
   ///
   /// ✅ Uses original Dio to reuse connection pool
   /// ✅ Marks request as retry to prevent infinite loop
-  Future<Response<dynamic>> _retryRequest(
-    RequestOptions requestOptions,
-    String newToken,
-  ) async {
+  Future<Response<dynamic>> _retryRequest(RequestOptions requestOptions, String newToken) async {
     // Clone request options with new token and retry marker
     final newOptions = requestOptions.copyWith(
       headers: {...requestOptions.headers, 'Authorization': newToken},
@@ -210,16 +195,10 @@ class GameApiTokenRefreshInterceptor extends Interceptor {
   Future<void> _retryAllPendingRequests(String newToken) async {
     for (final retry in _requestQueue) {
       try {
-        final retryResponse = await _retryRequest(
-          retry.requestOptions,
-          newToken,
-        );
+        final retryResponse = await _retryRequest(retry.requestOptions, newToken);
         retry.handler.resolve(retryResponse);
       } catch (e) {
-        final gameException = GameApiException(
-          message: 'Retry failed: $e',
-          originalError: e,
-        );
+        final gameException = GameApiException(message: 'Retry failed: $e', originalError: e);
 
         retry.handler.reject(
           DioException(

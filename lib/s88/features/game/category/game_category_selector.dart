@@ -50,7 +50,7 @@ class GameCategorySelector extends ConsumerStatefulWidget
   });
 
   final ValueChanged<GameCategorySelection> onSelectionChanged;
-  final Provider<GameCategories>? categoryProvider;
+  final Provider<CaxiloCategories>? categoryProvider;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -137,12 +137,12 @@ class _GameCategorySelectorState extends ConsumerState<GameCategorySelector> {
 
   Widget _buildCategoriesRow({
     required BuildContext context,
-    required GameCategories categoryData,
+    required CaxiloCategories categoryData,
     required GameCategorySelection selection,
     required EdgeInsetsGeometry padding,
     required void Function(GameCategorySelection) onSelectionChanged,
   }) {
-    final List<GameCategory> categories = categoryData.categories;
+    final List<CaxiloCategory> categories = categoryData.categories;
 
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(
@@ -159,19 +159,28 @@ class _GameCategorySelectorState extends ConsumerState<GameCategorySelector> {
 
           if (index == 0) {
             final isSelected = selection.isEmpty;
-            final path = allCategoryConfig.getIconPath(active: isSelected);
+            final category = categoryData.all;
+            final hasIcon = category.hasIcon;
+
             return Align(
               key: key,
               alignment: Alignment.center,
               child: GameCategoryButton(
-                label: allCategoryConfig.displayName,
+                label: category.displayName,
                 isSelected: isSelected,
-                onPressed: () =>
-                    onSelectionChanged(const GameCategorySelection()),
-                iconBuilder: (isSelected) => SizedBox(
-                  key: ValueKey('category_icon_$path'),
-                  child: ImageHelper.load(path: path),
-                ),
+                onPressed: () {
+                  onSelectionChanged(const GameCategorySelection());
+                },
+                iconBuilder: hasIcon
+                    ? (isSelected) {
+                        final path = category.getIconPath(active: isSelected);
+                        if (path == null) return const SizedBox.shrink();
+                        return SizedBox(
+                          key: ValueKey('category_icon_$path'),
+                          child: ImageHelper.load(path: path),
+                        );
+                      }
+                    : null,
               ),
             );
           }
@@ -183,14 +192,14 @@ class _GameCategorySelectorState extends ConsumerState<GameCategorySelector> {
             key: key,
             alignment: Alignment.center,
             child: GameCategoryButton(
-              label: category.label,
+              label: category.displayName,
               isSelected: isSelected,
-              badge: category.count > 0 ? '${category.count}' : null,
               onPressed: () => onSelectionChanged(
                 GameCategorySelection.fromCategory(category),
               ),
-              iconBuilder: (isSelected) =>
-                  _buildCategoryIcon(category, isSelected),
+              iconBuilder: category.hasIcon
+                  ? (isSelected) => _buildCategoryIcon(category, isSelected)
+                  : null,
             ),
           );
         },
@@ -199,14 +208,15 @@ class _GameCategorySelectorState extends ConsumerState<GameCategorySelector> {
   }
 
   bool _isCategorySelected(
-    GameCategory category,
+    CaxiloCategory category,
     GameCategorySelection selection,
   ) {
     return selection.category?.id == category.id;
   }
 
-  Widget _buildCategoryIcon(GameCategory category, bool isSelected) {
+  Widget _buildCategoryIcon(CaxiloCategory category, bool isSelected) {
     final path = category.getIconPath(active: isSelected);
+    if (path == null) return const SizedBox.shrink();
     return SizedBox(
       key: ValueKey('category_icon_$path'),
       child: ImageHelper.load(path: path),

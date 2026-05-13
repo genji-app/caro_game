@@ -90,8 +90,8 @@ class ProfileActionButton extends StatelessWidget {
                 ),
               ),
               Positioned.fill(
-                child: ImageHelper.getNetworkImage(
-                  imageUrl: AppImages.activatedglow,
+                child: ImageHelper.load(
+                  path: AppImages.activatedglow,
                 ),
               ),
             ],

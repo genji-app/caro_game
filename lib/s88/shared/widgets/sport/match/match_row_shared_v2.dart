@@ -8,6 +8,7 @@ import 'package:co_caro_flame/s88/core/services/models/api_v2/odds_style_model_v
 import 'package:co_caro_flame/s88/core/services/models/api_v2/score_model_v2.dart';
 import 'package:co_caro_flame/s88/core/services/providers/events_v2_filter_provider.dart';
 import 'package:co_caro_flame/s88/core/services/providers/favorite_provider.dart';
+import 'package:co_caro_flame/s88/features/parlay/presentation/mobile/providers/parlay_state_provider.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/image_helper.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_color.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_color_styles.dart';
@@ -290,7 +291,7 @@ class MatchFooterV2 extends ConsumerWidget {
               ),
               if (event.isParlay) ...[
                 const SizedBox(width: 20),
-                const ParlayIconButtonV2(),
+                ParlayIconButtonV2(eventId: event.eventId),
               ],
             ],
           ),
@@ -350,37 +351,45 @@ class MatchFooterV2 extends ConsumerWidget {
 }
 
 /// Parlay icon button with tooltip
-class ParlayIconButtonV2 extends StatefulWidget {
-  const ParlayIconButtonV2({super.key});
+class ParlayIconButtonV2 extends ConsumerStatefulWidget {
+  final int eventId;
+
+  const ParlayIconButtonV2({required this.eventId, super.key});
 
   @override
-  State<ParlayIconButtonV2> createState() => _ParlayIconButtonV2State();
+  ConsumerState<ParlayIconButtonV2> createState() => _ParlayIconButtonV2State();
 }
 
-class _ParlayIconButtonV2State extends State<ParlayIconButtonV2> {
+class _ParlayIconButtonV2State extends ConsumerState<ParlayIconButtonV2> {
   final GlobalKey _iconKey = GlobalKey();
 
-  void _showTooltip() {
+  void _showTooltip(bool isInCombo) {
     ParlayTooltip.show(
       context: context,
       targetKey: _iconKey,
-      message: 'Trận này chưa thêm vào cược xiên',
+      message: isInCombo
+          ? 'Trận này đã thêm vào cược xiên'
+          : 'Trận này chưa thêm vào cược xiên',
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isInCombo = ref.watch(isBetInComboProvider(widget.eventId));
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: _showTooltip,
+        onTap: () => _showTooltip(isInCombo),
         child: SizedBox(
           key: _iconKey,
           width: 20,
           height: 20,
           child: ImageHelper.load(
             path: AppIcons.iconParlay,
-            color: AppColorStyles.contentSecondary,
+            color: isInCombo
+                ? AppColors.green300
+                : AppColorStyles.contentSecondary,
           ),
         ),
       ),

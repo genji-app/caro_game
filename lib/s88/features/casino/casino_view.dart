@@ -1,5 +1,7 @@
+// ignore_for_file: unused_element
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fullscreen_guard/fullscreen_guard.dart';
 import 'package:gap/gap.dart';
 import 'package:co_caro_flame/s88/core/providers/live_chat_expanded_provider.dart';
 import 'package:co_caro_flame/s88/core/providers/main_content_provider.dart';
@@ -81,6 +83,7 @@ class _CasinoViewState extends ConsumerState<CasinoView> {
               // Main content body
               SliverList.list(
                 children: [
+                  // const _FullscreenTestBlock(),
                   Gap(canShowChat ? 12 : 6),
                   CasinoBanners(
                     onSun88Pressed: () {
@@ -181,5 +184,101 @@ class _StickyLiveChatDelegate extends SliverPersistentHeaderDelegate {
     return minHeight != oldDelegate.minHeight ||
         maxHeight != oldDelegate.maxHeight ||
         onStickyChanged != oldDelegate.onStickyChanged;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEBUG-ONLY: Fullscreen gate test block (kDebugMode guards it in the list)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FullscreenTestBlock extends StatelessWidget {
+  const _FullscreenTestBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final guard = FullscreenGuard.of(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1A2E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF7C4DFF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'DEBUG — Fullscreen Gate',
+            style: TextStyle(
+              color: Color(0xFF7C4DFF),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _DebugButton(
+                  label: 'Request Gate',
+                  color: const Color(0xFF4CAF50),
+                  onTap: () => guard.request(
+                    const FullscreenGateRequest(
+                      tag: 'homeTest',
+                      requiresGestureOnIosSafari: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _DebugButton(
+                  label: 'Clear Gate',
+                  color: const Color(0xFFE57373),
+                  onTap: guard.clear,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DebugButton extends StatelessWidget {
+  const _DebugButton({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.6)),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
   }
 }

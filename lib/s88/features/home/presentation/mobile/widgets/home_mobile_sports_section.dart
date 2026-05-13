@@ -240,7 +240,7 @@ class _HomeMobileSportsSectionState
   );
 
   Widget _buildSectionHeader(String title) => Container(
-    height: 40,
+    // height: 40,
     padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
     child: Row(
       children: [
@@ -334,8 +334,8 @@ class _HomeMobileSportsSectionState
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: ImageHelper.getNetworkImage(
-                    imageUrl: imagePath,
+                  child: ImageHelper.load(
+                    path: imagePath,
                     fit: BoxFit.cover,
                   ),
                 ),

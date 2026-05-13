@@ -32,11 +32,7 @@ class SbConfig {
   // static const String sun88BrandConfigUrl =
   //     'https://raw.githubusercontent.com/Vulcan-dev-25/configs/main/s88.json';
 
-  static const String sun88BrandConfigUrl = String.fromEnvironment(
-    'BRAND_CONFIG_URL',
-    defaultValue:
-        'https://raw.githubusercontent.com/Vulcan-dev-25/configs/main/s88.json',
-  );
+  static const String sun88BrandConfigUrl = 'https://raw.githubusercontent.com/Vulcan-dev-25/configs/main/s88_staging.json';
 
   // ===== BRAND & AGENT INFO =====
   // All values loaded at runtime from sun88BrandConfigUrl — not hardcoded

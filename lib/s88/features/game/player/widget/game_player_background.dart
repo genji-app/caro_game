@@ -24,8 +24,8 @@ class GamePlayerBackground extends StatelessWidget {
           // Background layer: Image with Gradient OR Solid Splash color
           SizedBox.square(
             dimension: 200,
-            child: ImageHelper.getNetworkImage(
-              imageUrl: AppImages.logoS88Home,
+            child: ImageHelper.load(
+              path: AppImages.logoS88Home,
               fit: BoxFit.contain,
             ),
           ),

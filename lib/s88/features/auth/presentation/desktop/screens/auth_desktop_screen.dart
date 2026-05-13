@@ -79,8 +79,8 @@ class _AuthDesktopScreenState extends ConsumerState<AuthDesktopScreen> {
                     top: 0,
                     left: 0,
                     right: 0,
-                    child: ImageHelper.getNetworkImage(
-                      imageUrl: AppImages.headerShadow,
+                    child: ImageHelper.load(
+                      path: AppImages.headerShadow,
                       fit: BoxFit.fill,
                     ),
                   ),

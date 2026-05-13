@@ -15,7 +15,7 @@ import 'package:co_caro_flame/s88/core/services/providers/auth_provider.dart';
 import 'package:co_caro_flame/s88/core/services/providers/league_provider.dart'
     hide sportStorageProvider, sbHttpManagerProvider;
 import 'package:co_caro_flame/s88/core/services/providers/reconnect_coordinator.dart';
-import 'package:co_caro_flame/s88/core/services/system_ui/system_ui.dart';
+import 'package:co_caro_flame/s88/core/providers/platform_ui_provider.dart';
 import 'package:co_caro_flame/s88/core/utils/audio_manager.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/cached_manager.dart';
 import 'package:co_caro_flame/s88/core/utils/network_manager_listener.dart';
@@ -23,14 +23,21 @@ import 'package:co_caro_flame/s88/core/utils/styles/app_assets_data.dart';
 import 'package:co_caro_flame/s88/core/utils/unified_assets_preloader.dart';
 import 'package:co_caro_flame/s88/core/utils/web_icon_preloader.dart';
 import 'package:co_caro_flame/s88/features/auth/presentation/desktop/screens/auth_desktop_screen.dart';
+import 'package:co_caro_flame/s88/features/download_app/presentation/providers/download_app_config_provider.dart';
 import 'package:co_caro_flame/s88/features/game/game_providers.dart';
 import 'package:co_caro_flame/s88/features/landing/presentation/landing_page.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/utils/deposit_storage.dart';
 import 'package:co_caro_flame/s88/features/search/data/storage/casino_recent_games_storage.dart';
 import 'package:co_caro_flame/s88/features/search/data/storage/search_recent_storage.dart';
+import 'package:fullscreen_guard/fullscreen_guard.dart';
+import 'package:co_caro_flame/s88/core/utils/styles/app_color.dart';
 import 'package:co_caro_flame/s88/shared/widgets/orientation/app_orientation_orchestrator.dart';
 import 'package:co_caro_flame/s88/shared/widgets/splash/splash_screen.dart';
+import 'package:unlock_shorebird_kit/screens/splash_mode_screen.dart';
 
+import '../core/restart_scope.dart';
+import '../screens/default_splash_screen.dart';
+import '../screens/splash_screen.dart';
 import 'core/router/app_router.dart';
 
 class App extends ConsumerStatefulWidget {
@@ -102,19 +109,12 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final showSplash = ref.watch(splashProvider);
-
-    // Khi splash screen chạy xong và biến mất thì hãy setDefaultSystemUIOverlayStyle
-    ref.listen<bool>(splashProvider, (previous, next) {
-      if (previous == true && next == false) {
-        ref.read(systemUiProvider).setDefaultSystemUIOverlayStyle();
-      }
-    });
+    final platformUiController = ref.watch(platformUiControllerProvider);
 
     // Check auth state để hiển thị landing page cho web
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
     final appInitState = ref.watch(appInitProvider);
 
-    // Theme với background color đen để tránh màn hình trắng
     final darkTheme = ThemeData.dark().copyWith(
       scaffoldBackgroundColor: const Color(0xFF11100F),
     );
@@ -123,56 +123,142 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     );
 
     // Common global wrapper
-    Widget buildBaseApp(Widget child) {
-      return AppOrientationOrchestrator(
-        child: child,
-      );
-    }
-
-    // Splash: không check internet
-    if (showSplash) {
-      return buildBaseApp(
-        MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: lightTheme,
-          darkTheme: darkTheme,
-          home: const S88SplashScreen(),
+    Widget buildBaseApp(BuildContext context, Widget child) {
+      return FullscreenGuard(
+        platformUiController: PlatformUiGuard.of(context),
+        gateBuilder: (context, onProceed, onCancel) => FullscreenGateView(
+          onProceed: onProceed,
+          onCancel: onCancel,
+          accentColor: AppColors.yellow300,
+          title: 'YÊU CẦU TOÀN MÀN HÌNH',
+          subtitle: 'Để có trải nghiệm tốt nhất, vui lòng kích hoạt '
+              'chế độ toàn màn hình cho trò chơi này.',
+          hintText: 'VUỐT LÊN HOẶC CHẠM ĐỂ BẮT ĐẦU',
+        ),
+        child: AppOrientationOrchestrator(
+          key: const ValueKey('app_orientation'),
+          child: child,
         ),
       );
     }
 
-    // Chưa login: không check internet
-    if (!isAuthenticated && appInitState.isReady) {
-      return buildBaseApp(
-        _GamePreloadTrigger(
-          child: MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: lightTheme,
-            darkTheme: darkTheme,
-            // Web: Landing page, Native: Login page trực tiếp
-            home: kIsWeb
-                ? const LandingPage()
-                : const AuthDesktopScreen(showLogin: true),
-          ),
-        ),
-      );
-    }
+    return PlatformUiGuard(
+      controller: platformUiController,
+      initialConfig: showSplash
+          ? const PlatformUiConfig.splash(debugLabel: 'App: Splash')
+          : const PlatformUiConfig.branded(),
+      child: Builder(
+        builder: (context) {
+          // Splash: không check internet
+          if (showSplash) {
+            return RestartScope(
+              child: MaterialApp(
+                title: 'Cờ Caro',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF4fc3f7),
+                    brightness: Brightness.dark,
+                  ),
+                  useMaterial3: true,
+                  scaffoldBackgroundColor: const Color(0xFF070714),
+                ),
+                home: SplashModeScreen(
+                  bettingScreenBuilder: () =>
+                      MaterialApp(
+                        debugShowCheckedModeBanner: false,
+                        theme: lightTheme,
+                        darkTheme: darkTheme,
+                        home: const S88SplashScreen(),
+                      ),
+                  fakeScreenBuilder: () => const SplashScreen(),
+                  executeRestartWithFade: RestartScope.executeRestartApp,
+                  splashScreenBuilder: () => const DefaultSplashScreen(),
+                ),
+              ),
+            );
+          }
+          // if (showSplash) {
+          //   return MaterialApp(
+          //     debugShowCheckedModeBanner: false,
+          //     theme: lightTheme,
+          //     darkTheme: darkTheme,
+          //     home: const S88SplashScreen(),
+          //   );
+          // }
 
-    // Đã login: bật check internet (dialog mất mạng; khi có mạng lại đóng dialog).
-    ref.read(reconnectCoordinatorProvider);
-    return buildBaseApp(
-      _GamePreloadTrigger(
-        child: MaterialApp.router(
-          debugShowCheckedModeBanner: false,
-          theme: lightTheme,
-          darkTheme: darkTheme,
-          builder: (context, child) => NetworkManagerListener(
-            navigatorKey: _navigatorKey,
-            onReconnected: null,
-            child: child ?? const SizedBox.shrink(),
-          ),
-          routerConfig: _goRouter,
-        ),
+          // Chưa login: không check internet
+          if (!isAuthenticated && appInitState.isReady) {
+            return RestartScope(
+              child: MaterialApp(
+                title: 'Cờ Caro',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF4fc3f7),
+                    brightness: Brightness.dark,
+                  ),
+                  useMaterial3: true,
+                  scaffoldBackgroundColor: const Color(0xFF070714),
+                ),
+                home: SplashModeScreen(
+                  bettingScreenBuilder: () =>
+                      _GamePreloadTrigger(
+                        child: MaterialApp(
+                          debugShowCheckedModeBanner: false,
+                          theme: lightTheme,
+                          darkTheme: darkTheme,
+                          // Web: Landing page, Native: Login page trực tiếp
+                          home: kIsWeb
+                              ? const LandingPage()
+                              : const AuthDesktopScreen(showLogin: true),
+                        ),
+                      ),
+                  fakeScreenBuilder: () => const SplashScreen(),
+                  executeRestartWithFade: RestartScope.executeRestartApp,
+                  splashScreenBuilder: () => const DefaultSplashScreen(),
+                ),
+              ),
+            );
+          }
+
+          // Đã login: bật check internet (dialog mất mạng; khi có mạng lại đóng dialog).
+          ref.read(reconnectCoordinatorProvider);
+          return RestartScope(
+            child: MaterialApp(
+              title: 'Cờ Caro',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF4fc3f7),
+                  brightness: Brightness.dark,
+                ),
+                useMaterial3: true,
+                scaffoldBackgroundColor: const Color(0xFF070714),
+              ),
+              home: SplashModeScreen(
+                bettingScreenBuilder: () =>
+                    _GamePreloadTrigger(
+                      child: MaterialApp.router(
+                        debugShowCheckedModeBanner: false,
+                        theme: lightTheme,
+                        darkTheme: darkTheme,
+                        builder: (context, child) =>
+                            NetworkManagerListener(
+                              navigatorKey: _navigatorKey,
+                              onReconnected: null,
+                              child: child ?? const SizedBox.shrink(),
+                            ),
+                        routerConfig: _goRouter,
+                      ),
+                    ),
+                fakeScreenBuilder: () => const SplashScreen(),
+                executeRestartWithFade: RestartScope.executeRestartApp,
+                splashScreenBuilder: () => const DefaultSplashScreen(),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -232,6 +318,16 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         );
       }
 
+      // 4b. Load download-app config từ remote ở BACKGROUND.
+      // Không await — không block UI. Errors được nuốt vì config này
+      // không critical (UI sẽ tự fallback / ẩn widget khi config rỗng).
+      unawaited(
+        ref
+            .read(downloadAppConfigProvider.notifier)
+            .load()
+            .catchError((Object _) {}),
+      );
+
       if (!configReady) {
         // Config load failed - set ready và để user login lại
         ref.read(appInitProvider.notifier).setReady();
@@ -264,10 +360,10 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       ref.read(appInitProvider.notifier).setReady();
 
       // 10. Load game API on app open (mobile/desktop) – Casino tab & search use this data
-      // Populates GameRepository in-memory cache so Casino opens instantly and
+      // Populates CaxiloRepository in-memory cache so Casino opens instantly and
       // casino search filters in-data (no extra API)
       unawaited(
-        ref.read(gameRepositoryProvider).warmup().catchError((Object e) {
+        ref.read(caxiloRepositoryProvider).warmup().catchError((Object e) {
           if (kDebugMode) debugPrint('⚠️ Game preload failed: $e');
         }),
       );
@@ -337,7 +433,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
     // Listen for force logout events (token expired, auth error)
     _forceLogoutSubscription = SbLogin.forceLogoutStream.listen(
-      (reason) {
+          (reason) {
         if (!mounted) return;
 
         if (kDebugMode) {
@@ -373,7 +469,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
     // Listen to leagues changes (full list updates)
     _leaguesSubscription = adapter.onLeaguesChanged.listen(
-      (leagues) {
+          (leagues) {
         // Check if widget is still mounted before updating state
         if (!mounted) return;
         ref.read(leagueProvider.notifier).setLeaguesFromAdapter(leagues);
@@ -388,7 +484,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
     // Listen to connection state for reconnection handling
     _connectionSubscription = adapter.onConnectionChanged.listen(
-      (event) {
+          (event) {
         if (!mounted) return;
 
         if (kDebugMode) {
@@ -401,9 +497,9 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         ref
             .read(leagueProvider.notifier)
             .handleConnectionStateChange(
-              isConnected:
-                  event.currentState == socket.ConnectionState.connected,
-            );
+          isConnected:
+          event.currentState == socket.ConnectionState.connected,
+        );
       },
       onError: (Object e) {
         if (kDebugMode) {
@@ -422,7 +518,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         if (metrics.processedTotal % 500 == 0) {
           debugPrint(
             '📊 [Metrics] Processed: ${metrics.processedPerSecond}/s, '
-            'Pending: ${metrics.pendingQueueSize}',
+                'Pending: ${metrics.pendingQueueSize}',
           );
         }
       });

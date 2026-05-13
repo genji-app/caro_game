@@ -226,8 +226,8 @@ class MatchStatsTable extends StatelessWidget {
           height: 28,
           decoration: const BoxDecoration(shape: BoxShape.circle),
           child: logoPath != null && logoPath.isNotEmpty
-              ? ImageHelper.getNetworkImage(
-                  imageUrl: logoPath,
+              ? ImageHelper.load(
+                  path: logoPath,
                   width: 28,
                   height: 28,
                   fit: BoxFit.cover,

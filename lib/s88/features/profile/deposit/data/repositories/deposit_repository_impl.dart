@@ -6,6 +6,7 @@ import 'package:co_caro_flame/s88/core/error/failures.dart';
 import 'package:co_caro_flame/s88/core/services/config/sb_config.dart';
 import 'package:co_caro_flame/s88/core/services/network/sb_http_manager.dart';
 import 'package:co_caro_flame/s88/core/utils/app_logger.dart';
+import 'package:co_caro_flame/s88/core/utils/hash_utils.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/fetch_bank_account_response.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/bank_deposit_request.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/bank_transaction_slip_request.dart';
@@ -260,15 +261,105 @@ class DepositRepositoryImpl implements DepositRepository {
   Future<Either<Failure, DepositResponse>> submitGiftcodeDeposit(
     GiftcodeDepositRequest request,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 1000));
+    try {
+      final config = SbConfig.instance;
+      final apiDomain = config.mainConfig['api_domain'] as String? ?? '';
 
-    return Right(
-      DepositResponse(
-        transactionId: 'TX${DateTime.now().millisecondsSinceEpoch}',
-        qrCodeUrl: null,
-        additionalData: {'giftcode': request.giftCode},
-      ),
-    );
+      if (apiDomain.isEmpty) {
+        return Left(ServerFailure(message: 'API domain not configured'));
+      }
+
+      final normalizedApiDomain = apiDomain.endsWith('/')
+          ? apiDomain
+          : '$apiDomain/';
+
+      final url = '${normalizedApiDomain}paygate';
+
+      final userToken = SbHttpManager.instance.userToken;
+      if (userToken.isEmpty) {
+        return Left(ServerFailure(message: 'User token not available'));
+      }
+
+      // hash = MD5(code + HSK)  — see HashUtils.createGiftCodeHash
+      final hash = HashUtils.createGiftCodeHash(
+        code: request.giftCode,
+        hsk: SbConfig.hsk,
+      );
+
+      // Web → preUseGiftCodeWeb, Native (iOS/Android) → preUseGiftCode
+      // Reference: GiftCodeView.ts (legacy Cocos client)
+      final command = kIsWeb ? 'preUseGiftCodeWeb' : 'preUseGiftCode';
+
+      final body = <String, dynamic>{
+        'command': command,
+        'code': request.giftCode,
+        'hash': hash,
+      };
+
+      final responseJson = await _httpManager.send(
+        url,
+        post: true,
+        body: jsonEncode(body),
+        contentJson: true,
+        json: true,
+        authorization: true,
+        token: userToken,
+      );
+
+      // Validate response
+      if (responseJson == null) {
+        return Left(ServerFailure(message: 'Empty response from server'));
+      }
+
+      if (responseJson is! Map<String, dynamic>) {
+        return Left(ServerFailure(message: 'Invalid response format'));
+      }
+
+      final status = responseJson['status'];
+      final data = responseJson['data'];
+      final dataMessage = (data is Map<String, dynamic>)
+          ? data['message']?.toString()
+          : null;
+
+      // Status == 0 → success (server returns message in data.message)
+      if (status == 0) {
+        final transactionId =
+            responseJson['transactionId'] ??
+            responseJson['transaction_id'] ??
+            (data is Map<String, dynamic>
+                ? (data['transactionId'] ?? data['transaction_id'])
+                : null) ??
+            'TX${DateTime.now().millisecondsSinceEpoch}';
+
+        return Right(
+          DepositResponse(
+            transactionId: transactionId.toString(),
+            qrCodeUrl: null,
+            additionalData: {
+              ...responseJson,
+              if (dataMessage != null) 'success_message': dataMessage,
+            },
+          ),
+        );
+      }
+
+      // Status == 500 → silent ignore (legacy behavior)
+      if (status == 500) {
+        return Left(ServerFailure(message: ''));
+      }
+
+      // Other non-zero status → return server message
+      final message =
+          dataMessage ?? responseJson['message']?.toString() ?? 'Có lỗi xảy ra';
+      return Left(ServerFailure(message: message));
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Failed to submit giftcode deposit',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return Left(ServerFailure(message: e.toString()));
+    }
   }
 
   @override

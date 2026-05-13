@@ -55,16 +55,16 @@ class ProfileAvatar extends ConsumerWidget {
     final urlEmpty = effectiveUrl?.isEmpty ?? true;
 
     final Widget defaultFallback = _useProvider
-        ? ImageHelper.getNetworkImage(
-            imageUrl: AppImages.avatar,
+        ? ImageHelper.load(
+            path: AppImages.avatar,
             fit: BoxFit.cover,
           )
         : const SizedBox.shrink();
 
     final avatarWidget = urlEmpty
         ? (fallback ?? defaultFallback)
-        : ImageHelper.getNetworkImage(
-            imageUrl: effectiveUrl!,
+        : ImageHelper.load(
+            path: effectiveUrl!,
             fit: BoxFit.cover,
           );
 

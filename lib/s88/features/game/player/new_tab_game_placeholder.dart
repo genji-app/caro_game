@@ -1,6 +1,6 @@
+import 'package:caxilo_repository/caxilo_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_color.dart';
 
 import 'new_tab_opener/new_tab_opener.dart';

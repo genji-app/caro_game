@@ -24,7 +24,10 @@ class LivestreamWidgetImpl extends StatefulWidget {
 
 class _LivestreamWidgetImplState extends State<LivestreamWidgetImpl>
     with AutomaticKeepAliveClientMixin {
-  bool _showControls = false;
+  // Bắt đầu với controls hiện — đảm bảo user thấy nút play ngay khi widget
+  // mount, trong trường hợp iOS không cho autoplay. Khi video thực sự bắt
+  // đầu play (event `playing`), listener sẽ trigger auto-hide 3s.
+  bool _showControls = true;
   Timer? _controlsTimer;
 
   @override
@@ -34,6 +37,35 @@ class _LivestreamWidgetImplState extends State<LivestreamWidgetImpl>
   void initState() {
     super.initState();
     _initWebView();
+    // Theo dõi trạng thái play/pause để UX controls khớp với state video:
+    // - Video paused  → force show controls (không auto-hide) để user thấy
+    //   nút play, tap để resume.
+    // - Video playing → rebuild để icon play/pause đổi trạng thái; auto-hide
+    //   timer vẫn chạy bình thường nếu đang hiện.
+    PipManager().isVideoPlaying.addListener(_onPlayStateChanged);
+  }
+
+  void _onPlayStateChanged() {
+    if (!mounted) return;
+    final isPlaying = PipManager().isVideoPlaying.value;
+    if (!isPlaying) {
+      // Video pause → giữ controls visible, dừng auto-hide timer.
+      _controlsTimer?.cancel();
+      if (!_showControls) {
+        setState(() => _showControls = true);
+      } else {
+        // Đã hiện rồi, chỉ cần rebuild để icon chuyển về 'play'.
+        setState(() {});
+      }
+    } else {
+      // Video playing → icon đổi sang 'pause'; nếu controls đang hiện, bật
+      // lại auto-hide để nó biến mất sau 3s như cũ.
+      if (_showControls) {
+        _showControlsWithAutoHide();
+      } else {
+        setState(() {});
+      }
+    }
   }
 
   @override
@@ -50,6 +82,7 @@ class _LivestreamWidgetImplState extends State<LivestreamWidgetImpl>
   @override
   void dispose() {
     _controlsTimer?.cancel();
+    PipManager().isVideoPlaying.removeListener(_onPlayStateChanged);
     // Đang PiP thì không release WebView (PiP overlay vẫn cần controller); không hide PiP.
     if (!PipManager().isPiPMode) {
       PipManager().releaseWebView();

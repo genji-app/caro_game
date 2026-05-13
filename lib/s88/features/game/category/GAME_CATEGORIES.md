@@ -1,71 +1,140 @@
-# Hướng dẫn Quản lý Danh mục Game (Game Categories)
+# Hệ thống Category & Lobby
 
-## Tổng quan
+## Tổng quan kiến trúc
 
-Hệ thống danh mục game đã được đơn giản hóa để tập trung vào trải nghiệm người dùng nhanh chóng và mã nguồn sạch sẽ (clean code). Chúng ta sử dụng một cấp danh mục duy nhất (thay vì hai cấp như trước đây) để giảm thiểu sự phức tạp.
+Game screen có hai mode rõ ràng, được quản lý bởi `GameViewMode`:
 
-## Thành phần chính
+| Mode | Khi nào | Hiển thị |
+|------|---------|----------|
+| `lobby` | Không có query, không có category | `GameLobbyView` (SDUI sections) |
+| `filter` | Có query hoặc đang chọn category | `GameGridView` (kết quả lọc) |
 
-### 1. GameCategory (Model)
-Sử dụng `sealed class` với Freezed để định nghĩa các loại danh mục khác nhau:
-- **GameTypeCategory**: Theo loại game (Casino, Slots, Sports, v.v.)
-- **ProviderCategory**: Theo nhà cung cấp (PG Soft, Pragmatic, v.v.)
-- **CustomCategory**: Theo tiêu chí tùy chỉnh (Game mới, Game Hot, v.v.)
+Mode được tính tự động qua `GameFilterStateX.viewMode` — không cần kiểm tra `isEmpty` rải rác.
 
-```dart
-// Ví dụ tạo danh mục Custom
-const GameCategory.custom(
-  categoryId: 'new_releases',
-  displayLabel: 'Mới ra mắt',
-  criteria: GameCategoryCriteria.byReleaseDate(daysAgo: 30),
-)
+---
+
+## Các thành phần chính
+
+### 1. `CasinoLobbySettings` (`casino_settings`)
+
+Config SDUI lobby từ remote, ánh xạ tới JSON key `"lobby"`:
+
+```json
+{
+  "lobby": {
+    "translation_key": "txt_game_category_all",
+    "icon": "ic_home.svg",
+    "icon_active": "ic_home_yellow.svg",
+    "sections": [
+      { "title": "Casino nổi bật", "filter": { "strategy": "collection", "params": { "id": "featured" } } },
+      { "banner_id": "providersBanner" }
+    ]
+  }
+}
 ```
 
-### 2. GameCategorySelection (State)
-Quản lý trạng thái danh mục đang được chọn. Khi `category` là `null`, hệ thống hiểu là đang chọn "Tất cả".
+Khi `lobby` là `null` hoặc thiếu bất kỳ field nào, repository tự fallback về preset hardcode.
 
-### 3. GameCategorySelector (UI)
-Widget hiển thị danh sách các danh mục dưới dạng thanh cuộn ngang (horizontal scroll).
+### 2. `CasinoCategory` với `group_key` (`casino_settings`)
 
-## Cách sử dụng
+Mỗi category trong `categories[]` có thể khai báo `group_key` để điều khiển sidebar:
 
-### Tích hợp vào màn hình
-Sử dụng `GameCategorySelector` trong `Scaffold` hoặc `Column`:
-
-```dart
-Column(
-  children: [
-    const GameCategorySelector(),
-    const Expanded(child: GameList()),
-  ],
-)
+```json
+{ "id": "sunwin", "group_key": "priority", "filter": { "strategy": "in_house" } }
+{ "id": "slots",  "group_key": "standard", "filter": { "strategy": "by_game_type", "params": { "game_type": "slot" } } }
+{ "id": "sports"  /* không có group_key → bị exclude khỏi sidebar */ }
 ```
 
-### Lọc danh sách Game
-Sử dụng phương thức `matches` trong `GameCategorySelection` để lọc dữ liệu:
+Giá trị `group_key`: `"priority"` | `"standard"` | không có (excluded).
+
+### 3. `CaxiloCategories` — domain model
 
 ```dart
-final selection = ref.watch(gameCategorySelectionProvider);
-final filteredGames = allGames.where((game) => 
-  selection.matches(game, game.providerId)
-).toList();
+// Lấy từ provider (reactive theo settings change)
+final categories = ref.watch(gameCategoriesProvider);
+
+categories.all         // Tab "All/Home" — từ lobby.translation_key/icon
+categories.categories  // Danh sách tabs còn lại — từ CasinoSettings.categories[]
 ```
 
-## Khả năng mở rộng
-
-Hệ thống được thiết kế để dễ dàng thêm các loại danh mục mới thông qua `GameFilter`. Bạn có thể tạo các bộ lọc phức tạp bằng cách kết hợp `filters`:
+### 4. `GameCategorySelection` — state
 
 ```dart
-// Lọc game vừa mới ra mắt VÀ đang phổ biến
-GameFilter.all(
-  filters: [
-    GameFilter.byReleaseDate(daysAgo: 7),
-    GameFilter.byPopularity(minPlayCount: 1000),
-  ],
-)
+// Tạo selection
+GameCategorySelection()                        // Rỗng = lobby mode
+GameCategorySelection.fromCategory(category)   // Có category = filter mode
+
+// Chuyển thành filter để gọi repository
+final filter = selection.toFilter(); // ← luôn dùng cái này
 ```
 
-## Ưu điểm của kiến trúc mới
-- **Đơn giản**: Chỉ một cấp lọc giúp người dùng không bị bối rối.
-- **Hiệu năng**: Giảm thiểu rebuild và logic phức tạp trong UI.
-- **Mở rộng**: Dễ dàng thêm tab mới chỉ bằng cách cập nhật dữ liệu từ API hoặc Provider.
+> ⚠️ `selection.matches(game)` **không hoạt động đúng** với collection-based categories
+> (newgames, featured, popular). Luôn dùng `toFilter()` + `repository.getGames(filter: ...)`.
+
+### 5. `GameFilterState` & `GameViewMode`
+
+```dart
+extension GameFilterStateX on GameFilterState {
+  GameViewMode get viewMode =>
+      searchQuery.isEmpty && categorySelection.isEmpty
+          ? GameViewMode.lobby
+          : GameViewMode.filter;
+}
+```
+
+`_runSearch()` trong `GameFilterNotifier` **bỏ qua** khi `viewMode == lobby` — game list
+chỉ được load khi user chọn category lần đầu (lazy loading).
+
+---
+
+## Provider graph
+
+```
+caxiloEventsProvider (Stream)
+    │
+    ├── gameCategoriesProvider        → CaxiloCategories (reactive)
+    └── casinoSidebarCategoriesProvider → CaxiloSidebarData (reactive)
+
+gameFilterProvider (autoDispose)
+    └── GameFilterState { searchQuery, categorySelection, results, status }
+        └── .viewMode → GameViewMode.lobby | .filter
+```
+
+---
+
+## Cách thêm category mới
+
+Chỉ cần cập nhật remote JSON (`categories[]` trong `CasinoSettings`):
+
+```json
+{
+  "id": "new_category",
+  "group_key": "standard",
+  "translation_key": "txt_game_new_category",
+  "icon": "ic_new.svg",
+  "icon_active": "ic_new_active.svg",
+  "filter": {
+    "strategy": "by_game_type",
+    "params": { "game_type": "..." }
+  }
+}
+```
+
+Không cần sửa code app — category sẽ tự xuất hiện sau khi settings reload.
+
+---
+
+## Sidebar grouping
+
+Desktop sidebar được chia thành 2 group:
+
+| Group | Nội dung |
+|-------|---------|
+| `priority` | Tab "All" + categories có `group_key: "priority"` (Sunwin, Jackpot) |
+| `standard` | Categories có `group_key: "standard"` (Slots, Live, Cards, ...) |
+
+Categories không có `group_key` được classify tự động theo loại filter (backward compat):
+- `InHouseFilter` / `ProvidersFilter` → priority
+- `CaxiloTypesFilter(jackpot)` → priority
+- `CaxiloTypesFilter(sport)` → bị exclude
+- Các type khác → standard

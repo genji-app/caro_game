@@ -67,43 +67,43 @@ class _SportDesktopSectionTabsState extends State<SportDesktopSectionTabs>
   Widget? _getLogo(String section) {
     switch (section) {
       case 'Cúp C1 Châu Âu':
-        return ImageHelper.getNetworkImage(
-          imageUrl: AppImages.logoChampion,
+        return ImageHelper.load(
+          path: AppImages.logoChampion,
           width: 32,
           height: 32,
           fit: BoxFit.contain,
         );
       case 'Ngoại hạng anh':
-        return ImageHelper.getNetworkImage(
-          imageUrl: AppImages.logoPremileague,
+        return ImageHelper.load(
+          path: AppImages.logoPremileague,
           width: 32,
           height: 32,
           fit: BoxFit.contain,
         );
       case 'Laliga':
-        return ImageHelper.getNetworkImage(
-          imageUrl: AppImages.logoLaliga,
+        return ImageHelper.load(
+          path: AppImages.logoLaliga,
           width: 32,
           height: 32,
           fit: BoxFit.contain,
         );
       case 'Seria A':
-        return ImageHelper.getNetworkImage(
-          imageUrl: AppImages.logoSeriA,
+        return ImageHelper.load(
+          path: AppImages.logoSeriA,
           width: 32,
           height: 32,
           fit: BoxFit.contain,
         );
       case 'Bundesliga':
-        return ImageHelper.getNetworkImage(
-          imageUrl: AppImages.logoBundesliga,
+        return ImageHelper.load(
+          path: AppImages.logoBundesliga,
           width: 32,
           height: 32,
           fit: BoxFit.contain,
         );
       case 'Ligue 1':
-        return ImageHelper.getNetworkImage(
-          imageUrl: AppImages.logoLeague1,
+        return ImageHelper.load(
+          path: AppImages.logoLeague1,
           width: 32,
           height: 32,
           fit: BoxFit.contain,

@@ -13,6 +13,7 @@ enum SettlementStatusEnum {
   running, // Đang diễn ra
   refunded, // Hoàn tiền
   voided, // Hủy/Hoàn tiền
+  declined, // Bị từ chối
   processing, // Đang xử lý
   unknown; // Không xác định
 
@@ -25,7 +26,8 @@ enum SettlementStatusEnum {
     SettlementStatusEnum.draw ||
     SettlementStatusEnum.cashout ||
     SettlementStatusEnum.refunded ||
-    SettlementStatusEnum.voided => true,
+    SettlementStatusEnum.voided ||
+    SettlementStatusEnum.declined => true,
     _ => false,
   };
 
@@ -45,6 +47,7 @@ enum SettlementStatusEnum {
       'void' || 'voided' => SettlementStatusEnum.voided,
       'refund' || 'refunded' => SettlementStatusEnum.refunded,
       'cashout' => SettlementStatusEnum.cashout,
+      'declined' => SettlementStatusEnum.declined,
       'pending' => SettlementStatusEnum.pending,
       'running' || 'active' => SettlementStatusEnum.running,
       'processing' => SettlementStatusEnum.processing,
@@ -62,6 +65,7 @@ enum SettlementStatusEnum {
     SettlementStatusEnum.voided => 'Voided',
     SettlementStatusEnum.refunded => 'Refunded',
     SettlementStatusEnum.cashout => 'Cashout',
+    SettlementStatusEnum.declined => 'Declined',
     SettlementStatusEnum.pending => 'Pending',
     SettlementStatusEnum.running => 'Running',
     SettlementStatusEnum.processing => 'Processing',

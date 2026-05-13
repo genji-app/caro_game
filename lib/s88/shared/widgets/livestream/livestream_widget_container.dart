@@ -156,6 +156,18 @@ class LivestreamWidgetContainer extends StatelessWidget {
             ),
           ),
         ),
+        // Play/Pause ở giữa PiP window — rebuild khi isVideoPlaying đổi.
+        Positioned.fill(
+          child: Center(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: pip.isVideoPlaying,
+              builder: (_, isPlaying, __) => _PlayPauseIconButton(
+                isPlaying: isPlaying,
+                onTap: () => pip.togglePlayPause(),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -201,6 +213,33 @@ class LivestreamWidgetContainer extends StatelessWidget {
             if (hasError && buildErrorOverlay != null)
               Positioned.fill(
                 child: buildErrorOverlay!('Không thể tải livestream'),
+              ),
+            // Play/Pause icon ở giữa video — hiện cùng điều kiện với PiP
+            // icon (showControls + không ở PiP mode vì PiP overlay có
+            // controls riêng). Container tự quản lý state qua PipManager
+            // — caller không phải pass callback.
+            if (showControls && !pip.isPiPMode)
+              Positioned.fill(
+                child: IgnorePointer(
+                  // IgnorePointer wrap Center để tap ở vùng trống xung quanh
+                  // icon (vẫn trong Center area) không chặn onTapContent
+                  // bên dưới. Chỉ bản thân _PlayPauseIconButton bắt tap.
+                  ignoring: false,
+                  child: Center(
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: pip.isVideoPlaying,
+                      builder: (_, isPlaying, __) => _PlayPauseIconButton(
+                        isPlaying: isPlaying,
+                        onTap: () {
+                          pip.togglePlayPause();
+                          // Reset auto-hide timer để controls không biến
+                          // mất ngay sau khi user vừa tương tác.
+                          onTapContent?.call();
+                        },
+                      ),
+                    ),
+                  ),
+                ),
               ),
             if (showPiPIcon)
               Positioned(
@@ -253,6 +292,36 @@ class LivestreamWidgetContainer extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Nút play/pause hiển thị ở giữa video khi `showControls = true`. Icon
+/// chuyển giữa `play_arrow` / `pause` theo `isPlaying`.
+class _PlayPauseIconButton extends StatelessWidget {
+  const _PlayPauseIconButton({required this.isPlaying, required this.onTap});
+
+  final bool isPlaying;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: const BoxDecoration(
+          color: Color(0x99000000),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          isPlaying ? Icons.pause : Icons.play_arrow,
+          color: Colors.white,
+          size: 32,
         ),
       ),
     );

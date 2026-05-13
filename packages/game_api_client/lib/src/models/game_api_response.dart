@@ -66,10 +66,7 @@ sealed class GameApiResponse<T> with _$GameApiResponse<T> {
   /// Parse JSON response and determine success/failure
   ///
   /// Automatically routes to success or failure variant based on code/status.
-  factory GameApiResponse.fromJson(
-    Map<String, dynamic> json,
-    T Function(Object? json) fromJsonT,
-  ) {
+  factory GameApiResponse.fromJson(Map<String, dynamic> json, T Function(Object? json) fromJsonT) {
     final code = json['code'] as int? ?? 0;
     final status = json['status'] as int? ?? 0;
     final message = json['message']?.toString() ?? '';
@@ -86,12 +83,7 @@ sealed class GameApiResponse<T> with _$GameApiResponse<T> {
     }
 
     // Failure: code != 0 || status != 0
-    return GameApiFailureResponse<T>(
-      message: message,
-      code: code,
-      status: status,
-      data: rawData,
-    );
+    return GameApiFailureResponse<T>(message: message, code: code, status: status, data: rawData);
   }
 }
 

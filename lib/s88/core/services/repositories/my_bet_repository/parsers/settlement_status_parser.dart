@@ -55,8 +55,7 @@ class SettlementStatusParser {
       case BetSlipStatus.running:
         return SettlementStatusEnum.running;
       case BetSlipStatus.declined:
-        return SettlementStatusEnum
-            .pending; // Or added a declined status to SettlementStatusEnum if needed
+        return SettlementStatusEnum.declined;
       case BetSlipStatus.settled:
         if (settlementStatus != null) {
           return _parseFromSettlementStatus(settlementStatus, bet);

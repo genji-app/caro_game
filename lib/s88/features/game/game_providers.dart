@@ -1,11 +1,90 @@
+import 'dart:convert';
+
+import 'package:caxilo_repository/caxilo_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:game_api_client/game_api_client.dart';
+import 'package:game_api_client/game_api_client.dart' as gac;
 import 'package:co_caro_flame/s88/core/services/auth/token_error_handler.dart';
+import 'package:co_caro_flame/s88/core/services/auth/token_manager.dart';
 import 'package:co_caro_flame/s88/core/services/network/dio_logger_interceptor.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/core/services/sportbook_api.dart'
     show SbHttpManager, SbConfig;
+
+/// Chứa các cấu hình được truyền vào lúc build app (qua --dart-define)
+class CaxiloEnv {
+  const CaxiloEnv({required this.environment, this.configUrl});
+
+  final CaxiloEnvironment environment;
+  final String? configUrl;
+}
+
+/// Provider cung cấp biến môi trường cho Caxilo
+final caxiloEnvProvider = Provider<CaxiloEnv>((ref) {
+  const envUrl = 'https://raw.githubusercontent.com/Vulcan-dev-25/configs/main/caxilo_staging.json'; // String.fromEnvironment('CASINO_CONFIG_URL');
+  const appEnvString = String.fromEnvironment('APP_ENV', defaultValue: 'staging');
+
+  final CaxiloEnvironment environment;
+  if (appEnvString == 'prod') {
+    environment = CaxiloEnvironment.prod;
+  } else if (appEnvString == 'staging') {
+    environment = CaxiloEnvironment.staging;
+  } else {
+    environment = CaxiloEnvironment.dev;
+  }
+
+  // Tiền xử lý URL hiệu quả:
+  final isDev = environment == CaxiloEnvironment.dev;
+  final effectiveUrl = isDev ? null : (envUrl.isNotEmpty ? envUrl : null);
+
+  return CaxiloEnv(environment: environment, configUrl: effectiveUrl);
+});
+
+/// {@template casino_settings_client_provider}
+/// Provider for [CaxiloConfigClient], which manages remote configurations
+/// and provides domain logic for in-house games.
+/// {@endtemplate}
+final caxiloConfigClientProvider = Provider<CaxiloConfigClient>((ref) {
+  // Đọc cấu hình môi trường từ provider
+  final env = ref.watch(caxiloEnvProvider);
+
+  final client = CaxiloConfigClient.create(
+    refreshTokenProvider: () => TokenManager.getRefreshToken(),
+    tokenProvider: () => SbHttpManager.instance.userToken,
+    environment: env.environment,
+    initialUrl: env.configUrl,
+  );
+
+  // [MODE: Local Test] JSON config baked into binary via --dart-define.
+  // Priority 1 — overrides both preset and remote sync.
+  // Usage: make run-local-staging / run-local-prod
+  const localConfig = String.fromEnvironment('CASINO_CONFIG_JSON');
+  if (localConfig.isNotEmpty) {
+    try {
+      client.loadFromMap(
+        jsonDecode(utf8.decode(base64.decode(localConfig)))
+            as Map<String, dynamic>,
+      );
+      debugPrint('✅ CaxiloConfig: local-test mode (${env.environment.name})');
+    } catch (e) {
+      debugPrint('❌ CaxiloConfig: CASINO_CONFIG_JSON parse failed: $e');
+    }
+    return client;
+  }
+
+  // [MODE: Remote] Priority 2 — sync từ GitHub URL (staging/prod)
+  if (env.environment != CaxiloEnvironment.dev && env.configUrl != null) {
+    client.sync().catchError((Object e) {
+      debugPrint('❌ CaxiloConfig Sync Error: $e');
+      debugPrint(
+        'ℹ️ Sync failed. Using ${env.environment.name} fallback settings.',
+      );
+    });
+  }
+
+  // [MODE: Dev] Priority 3 — Dart preset đã được load sẵn bởi CaxiloConfigClient.create()
+
+  return client;
+});
 
 /// {@template game_api_client_provider}
 /// Provider that manages the lifecycle of [GameApiClient].
@@ -13,13 +92,13 @@ import 'package:co_caro_flame/s88/core/services/sportbook_api.dart'
 /// Configures the base URL from [SbConfig] and sets up the [Dio] client
 /// with automatic token refresh via [TokenErrorHandler].
 /// {@endtemplate}
-final gameApiClientProvider = Provider<GameApiClient>((ref) {
+final gameApiClientProvider = Provider<gac.GameApiClient>((ref) {
   // Pre-configured full URL from remote config.
   // Previously: final domainUrl = SbConfig.gameApiUrl;
   // Previously: final gameBaseUrl = '$domainUrl/gameapi/public';
   final gameApiUrl = SbConfig.gameApiUrl;
 
-  final dioClient = GameApiClient.createDioClient(gameApiUrl, () async {
+  final dioClient = gac.GameApiClient.createDioClient(gameApiUrl, () async {
     final refreshed = await TokenErrorHandler.instance.handleTokenError();
     return refreshed ? SbHttpManager.instance.userToken : null;
   });
@@ -30,37 +109,27 @@ final gameApiClientProvider = Provider<GameApiClient>((ref) {
     dioClient.interceptors.add(DioLoggerInterceptor());
   }
 
-  return GameApiClient(
+  return gac.GameApiClient(
     dio: dioClient,
     tokenProvider: () async => SbHttpManager.instance.userToken,
   );
 });
 
-/// {@template in_house_game_api_client_provider}
-/// Provider for [GameInHouseApiClient], for in-house/local games.
-/// {@endtemplate}
-final gameInHouseApiClientProvider = Provider<GameInHouseApiClient>((ref) {
-  return GameInHouseApiClient(
-    tokenProvider: () => SbHttpManager.instance.userToken,
-    fish88Url: 'https://fish-s88.sandboxg1.win',
-  );
-});
-
-/// {@template game_repository_provider}
-/// Provider for [GameRepository], which centralizes game data fetching
+/// {@template caxilo_repository_provider}
+/// Provider for [CaxiloRepository], which centralizes game data fetching
 /// and caching logic.
 /// {@endtemplate}
-final gameRepositoryProvider = Provider<GameRepository>((ref) {
+final caxiloRepositoryProvider = Provider<CaxiloRepository>((ref) {
   final client = ref.watch(gameApiClientProvider);
-  final gameInHouseApiClient = ref.watch(gameInHouseApiClientProvider);
+  final configClient = ref.watch(caxiloConfigClientProvider);
 
-  final repository = GameRepository(
+  final repository = CaxiloRepository(
     client: client,
-    inHouseClient: gameInHouseApiClient,
+    configClient: configClient,
 
     /// for test
     // storage: kDebugMode
-    //     ? InMemoryGameStorage(ttl: const Duration(milliseconds: 1))
+    //     ? InMemoryCaxiloStorage(ttl: const Duration(milliseconds: 1))
     //     : null,
   );
 
@@ -68,27 +137,27 @@ final gameRepositoryProvider = Provider<GameRepository>((ref) {
   return repository;
 });
 
-/// {@template game_events_provider}
-/// A [StreamProvider] that bridges [GameRepository.events] to Riverpod.
+/// {@template caxilo_events_provider}
+/// A [StreamProvider] that bridges [CaxiloRepository.events] to Riverpod.
 ///
-/// Emits [GameEvent]s whenever the repository state changes,
+/// Emits [CaxiloEvent]s whenever the repository state changes,
 /// allowing UI components to reactively update.
 /// {@endtemplate}
-final gameEventsProvider = StreamProvider.autoDispose<GameEvent>((ref) {
-  final repository = ref.watch(gameRepositoryProvider);
+final caxiloEventsProvider = StreamProvider.autoDispose<CaxiloEvent>((ref) {
+  final repository = ref.watch(caxiloRepositoryProvider);
   return repository.events;
 });
 
 /// {@template all_games_provider}
 /// A [FutureProvider] that fetches and caches the list of all available games.
 ///
-/// Automatically re-runs when [gameEventsProvider] emits a new event,
+/// Automatically re-runs when [caxiloEventsProvider] emits a new event,
 /// ensuring the UI always has the freshest data.
 /// {@endtemplate}
 final allGamesProvider = FutureProvider.autoDispose<List<GameBlock>>((
   ref,
 ) async {
-  ref.watch(gameEventsProvider);
-  final repository = ref.watch(gameRepositoryProvider);
+  ref.watch(caxiloEventsProvider);
+  final repository = ref.watch(caxiloRepositoryProvider);
   return repository.getGames();
 });

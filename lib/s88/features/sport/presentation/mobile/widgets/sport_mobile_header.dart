@@ -96,8 +96,8 @@ class SportMobileHeader extends ConsumerWidget implements PreferredSizeWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    ImageHelper.getNetworkImage(
-                      imageUrl: AppImages.btnRefill,
+                    ImageHelper.load(
+                      path: AppImages.btnRefill,
                       width: 56,
                       height: 36,
                       fit: BoxFit.contain,

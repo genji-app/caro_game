@@ -15,7 +15,7 @@ class ScoreHeaderConfig {
   static const double columnWidth = 28.0;
 
   /// Gap between columns on mobile (px)
-  static const double columnGap = 4.0;
+  static const double columnGap = 2.5;
 
   /// Gap between columns on desktop (px)
   static const double columnGapDesktop = 16.0;

@@ -5,8 +5,8 @@ import 'package:co_caro_flame/s88/features/parlay/domain/models/single_bet_data.
 
 /// Betting Repository Interface
 abstract class BettingRepository {
-  Future<CalculateBetResponse> calculateBet(CalculateBetRequest request);
-  Future<PlaceBetResponse> placeBet(PlaceBetRequest request);
+  Future<CalculateBetResponse> calculateBet(CalculateBetRequest request, {int? sportId});
+  Future<PlaceBetResponse> placeBet(PlaceBetRequest request, {int? sportId});
 
   /// Calculate parlay bet - returns min/max stakes and matches limits
   Future<CalculateBetResponse> calculateParlayBet(
@@ -30,7 +30,7 @@ class BettingRepositoryImpl implements BettingRepository {
     : _http = http ?? SbHttpManager.instance;
 
   @override
-  Future<CalculateBetResponse> calculateBet(CalculateBetRequest request) async {
+  Future<CalculateBetResponse> calculateBet(CalculateBetRequest request, {int? sportId}) async {
     final body = {
       'leagueId': request.leagueId,
       'matchTime': request.matchTime,
@@ -41,15 +41,19 @@ class BettingRepositoryImpl implements BettingRepository {
       'oddsStyle': request.oddsStyle,
     };
 
-    final response = await _http.calculateBets(body);
+    final response = await _http.calculateBets(body, sportId: sportId);
     return CalculateBetResponse.fromJson(response);
   }
 
   @override
-  Future<PlaceBetResponse> placeBet(PlaceBetRequest request) async {
+  Future<PlaceBetResponse> placeBet(PlaceBetRequest request, {int? sportId}) async {
     final selectionsJson = request.selections.map((s) {
       return s.toRequestJson(s.stake ?? 0);
     }).toList();
+
+    // Extract sportId from selections if not provided (all selections in a single bet share the same sport)
+    final effectiveSportId = sportId ??
+        (request.selections.isNotEmpty ? request.selections.first.sportId : 1);
 
     final body = {
       'acceptBetterOdds': request.acceptBetterOdds,
@@ -62,7 +66,7 @@ class BettingRepositoryImpl implements BettingRepository {
     // Debug log request body
     debugPrint('[BettingRepository] placeBet body: $body');
 
-    final response = await _http.placeBets(body);
+    final response = await _http.placeBets(body, sportId: effectiveSportId);
     debugPrint('[BettingRepository] placeBet response: $response');
     return PlaceBetResponse.fromJson(response);
   }
@@ -91,8 +95,11 @@ class BettingRepositoryImpl implements BettingRepository {
       'parlay': true,
     };
 
+    // Extract sportId from combo bets
+    final sportId = comboBets.isNotEmpty ? comboBets.first.sportId : 1;
+
     // Use calculateBetsParlay which adds token/userId to body
-    final response = await _http.calculateBetsParlay(body);
+    final response = await _http.calculateBetsParlay(body, sportId: sportId);
     return CalculateBetResponse.fromJson(response);
   }
 
@@ -135,8 +142,11 @@ class BettingRepositoryImpl implements BettingRepository {
 
     // debugPrint('[BettingRepository] placeParlayBet body: $body');
 
+    // Extract sportId from combo bets (all bets in a parlay share the same sport)
+    final sportId = comboBets.isNotEmpty ? comboBets.first.sportId : 1;
+
     // Use v2/placeBets endpoint for parlay
-    final response = await _http.placeBetsParlay(body);
+    final response = await _http.placeBetsParlay(body, sportId: sportId);
     // debugPrint('[BettingRepository] placeParlayBet raw response: $response');
 
     try {

@@ -17,8 +17,8 @@ typedef TokenProvider = Future<String?> Function();
 class GameApiClient {
   /// {@macro game_api_client}
   GameApiClient({required Dio dio, required TokenProvider tokenProvider})
-      : _dio = dio,
-        _tokenProvider = tokenProvider;
+    : _dio = dio,
+      _tokenProvider = tokenProvider;
 
   final Dio _dio;
   final TokenProvider _tokenProvider;
@@ -31,10 +31,7 @@ class GameApiClient {
   ///
   /// Optionally accepts an [onRefreshToken] callback for handling 401 errors
   /// through the [GameApiTokenRefreshInterceptor].
-  static Dio createDioClient(
-    String baseUrl, [
-    TokenRefreshCallback? onRefreshToken,
-  ]) {
+  static Dio createDioClient(String baseUrl, [TokenRefreshCallback? onRefreshToken]) {
     final dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
@@ -127,12 +124,8 @@ extension _GameApiResponseClientX<T> on GameApiResponse<T> {
   /// This is used internally by [GameApiClient] after the [GameApiErrorInterceptor]
   /// has processed the raw response.
   T get dataOrThrow => map(
-        success: (s) => s.data,
-        failure: (f) => throw GameApiException(
-          message: f.message,
-          code: f.code,
-          status: f.status,
-          data: f.data,
-        ),
-      );
+    success: (s) => s.data,
+    failure: (f) =>
+        throw GameApiException(message: f.message, code: f.code, status: f.status, data: f.data),
+  );
 }

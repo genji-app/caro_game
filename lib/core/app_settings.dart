@@ -125,6 +125,7 @@ class AppSettings extends ChangeNotifier {
   AiDifficulty _aiDifficulty = AiDifficulty.medium;
   BoardBackground _boardBackground = BoardBackground.midnight;
   BoardSizePreset _boardSizePreset = BoardSizePreset.n15;
+  bool _hasSeenOnboarding = false;
 
   int get turnTimeSecs => _turnTimeSecs;
   PieceSkin get skin => _skin;
@@ -133,6 +134,7 @@ class AppSettings extends ChangeNotifier {
   AiDifficulty get aiDifficulty => _aiDifficulty;
   BoardBackground get boardBackground => _boardBackground;
   BoardSizePreset get boardSizePreset => _boardSizePreset;
+  bool get hasSeenOnboarding => _hasSeenOnboarding;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -149,6 +151,14 @@ class AppSettings extends ChangeNotifier {
     final int bsIdx = prefs.getInt('boardSizePreset') ?? BoardSizePreset.n15.index;
     _boardSizePreset =
         BoardSizePreset.values[bsIdx.clamp(0, BoardSizePreset.values.length - 1)];
+    _hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+    notifyListeners();
+  }
+
+  Future<void> setHasSeenOnboarding(bool value) async {
+    _hasSeenOnboarding = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenOnboarding', value);
     notifyListeners();
   }
 

@@ -16,6 +16,7 @@ extension SettlementStatusUIExt on SettlementStatusEnum {
     SettlementStatusEnum.voided ||
     SettlementStatusEnum.refunded => I18n.txtRefunded,
     SettlementStatusEnum.cashout => I18n.txtSold,
+    SettlementStatusEnum.declined => I18n.txtDeclined,
     SettlementStatusEnum.processing => I18n.txtProcessing,
     SettlementStatusEnum.running => I18n.txtCurrentlyActive,
     _ => I18n.txtPending,
@@ -29,7 +30,8 @@ extension SettlementStatusUIExt on SettlementStatusEnum {
     SettlementStatusEnum.halfLost => AppColors.red400,
     SettlementStatusEnum.draw ||
     SettlementStatusEnum.voided ||
-    SettlementStatusEnum.refunded => AppColors.gray300,
+    SettlementStatusEnum.refunded ||
+    SettlementStatusEnum.declined => AppColors.gray300,
     SettlementStatusEnum.cashout => AppColors.blue300,
     SettlementStatusEnum.processing => AppColors.yellow400,
     _ => AppColors.gray300,

@@ -125,13 +125,13 @@ class _Sun88Card extends StatelessWidget {
       color: const Color(0xFF111010),
       colorOverlay: AppColors.yellow300.withValues(alpha: 0.45),
       onTap: onTap,
-      childTextContent: _CardText(
+      childTextContent: CardText(
         title: 'Sun88',
         subtitle: 'Thương hiệu cá cược thể thao của SunWin',
         titleColor: AppColors.yellow500,
         isMobile: isMobile,
       ),
-      overlayImageBuilder: (isHovered) => _CardImage(
+      overlayImageBuilder: (isHovered) => CardImage(
         path: AppImages.imageBannerSun88,
         isMobile: isMobile,
         isHovered: isHovered,
@@ -162,13 +162,13 @@ class _CasinoGameCard extends StatelessWidget {
       colorOverlay: const Color(0xFF86CB3C).withValues(alpha: 0.45),
       borderColor: const Color(0xFF86CB3C),
       onTap: onTap,
-      childTextContent: _CardText(
+      childTextContent: CardText(
         title: '500+',
         subtitle: 'Casino game',
         titleColor: AppColors.green400,
         isMobile: isMobile,
       ),
-      overlayImageBuilder: (isHovered) => _CardImage(
+      overlayImageBuilder: (isHovered) => CardImage(
         path: AppImages.imageBannerCasino,
         isMobile: isMobile,
         isHovered: isHovered,
@@ -183,13 +183,13 @@ class _CasinoGameCard extends StatelessWidget {
 }
 
 /// Reusable widget for the text content within a card.
-class _CardText extends StatelessWidget {
+class CardText extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color titleColor;
   final bool isMobile;
 
-  const _CardText({
+  const CardText({
     required this.title,
     required this.subtitle,
     required this.titleColor,
@@ -222,7 +222,11 @@ class _CardText extends StatelessWidget {
 }
 
 /// Reusable widget for the floating/animated image within a card.
-class _CardImage extends StatelessWidget {
+///
+/// When [usePositioning] is true (default), this widget MUST be a direct child
+/// of a [Stack]. When false, it returns a plain sized image suitable for
+/// inline use inside a [Column]/[Row]/[Padding].
+class CardImage extends StatelessWidget {
   final String path;
   final bool isMobile;
   final bool isHovered;
@@ -233,8 +237,9 @@ class _CardImage extends StatelessWidget {
   final double right;
   final double hoverTopOffset;
   final double hoverRightOffset;
+  final bool usePositioning;
 
-  const _CardImage({
+  const CardImage({
     required this.path,
     required this.isMobile,
     required this.isHovered,
@@ -245,16 +250,30 @@ class _CardImage extends StatelessWidget {
     required this.right,
     this.hoverTopOffset = 0,
     this.hoverRightOffset = 0,
+    this.usePositioning = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final image = ImageHelper.load(path: path, fit: BoxFit.cover);
+
+    // Inline mode: parent is NOT a Stack — return a plain SizedBox.
+    if (!usePositioning) {
+      final width = isMobile
+          ? mobileWidth
+          : (isHovered ? hoverWidth : desktopWidth);
+      print('[Banner] width game banner: $width');
+      return SizedBox(width: double.infinity, child: image);
+    }
+    print('[Banner] mobileWidth game banner: $mobileWidth');
+    print('[Banner] desktopWidth game banner: $desktopWidth');
+
     if (isMobile) {
       return Positioned(
         top: top,
         right: right,
         width: mobileWidth,
-        child: ImageHelper.load(path: path, fit: BoxFit.contain),
+        child: image,
       );
     }
     return AnimatedPositioned(
@@ -263,7 +282,7 @@ class _CardImage extends StatelessWidget {
       top: isHovered ? top + hoverTopOffset : top,
       right: isHovered ? right + hoverRightOffset : right,
       width: isHovered ? hoverWidth : desktopWidth,
-      child: ImageHelper.load(path: path, fit: BoxFit.contain),
+      child: image,
     );
   }
 }

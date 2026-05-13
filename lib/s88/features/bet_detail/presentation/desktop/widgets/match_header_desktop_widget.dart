@@ -240,8 +240,8 @@ class _MatchHeaderDesktopWidgetState extends State<MatchHeaderDesktopWidget>
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: ImageHelper.getNetworkImage(
-                    imageUrl: _getStatisticsBackgroundImageUrl(),
+                  child: ImageHelper.load(
+                    path: _getStatisticsBackgroundImageUrl(),
                     fit: BoxFit.fill,
                   ),
                 ),

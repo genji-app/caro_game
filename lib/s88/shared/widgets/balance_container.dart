@@ -101,18 +101,17 @@ class _BalanceText extends ConsumerWidget {
             // Trigger fetch by reading the future
             unawaited(ref.read(configDepositProvider.future));
 
-            final deviceType = ResponsiveBuilder.getDeviceType(context);
-            if (deviceType == DeviceType.mobile) {
-              // Mobile: Show bottom sheet
+            // Portrait-only app: width đủ phân biệt 3 nhánh.
+            // Phone → bottom sheet. Tablet/iPad + desktop → overlay (Option A).
+            if (ResponsiveBuilder.getDeviceType(context) != DeviceType.desktop) {
               DepositMobileBottomSheet.show(context);
             } else {
-              // Close ProfileOverlay and show DepositOverlay
               ProfileNavigation.maybeOf(context)?.close();
               ref.read(depositOverlayVisibleProvider.notifier).state = true;
             }
           },
-          child: ImageHelper.getNetworkImage(
-            imageUrl: AppImages.btnRefill,
+          child: ImageHelper.load(
+            path: AppImages.btnRefill,
             width: 56,
             height: 36,
             fit: BoxFit.contain,

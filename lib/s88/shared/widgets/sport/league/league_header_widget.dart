@@ -113,8 +113,8 @@ class LeagueHeaderWidget extends ConsumerWidget {
         height: isDesktop ? 28 : 26,
         decoration: _logoDecoration,
         padding: const EdgeInsets.all(2),
-        child: ImageHelper.getNetworkImage(
-          imageUrl: league.leagueLogo,
+        child: ImageHelper.load(
+          path: league.leagueLogo,
           width: isDesktop ? 24 : 22,
           height: isDesktop ? 24 : 22,
           fit: BoxFit.contain,

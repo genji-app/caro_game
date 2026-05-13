@@ -19,7 +19,7 @@ class _SportDesktopSidebarState extends State<SportDesktopSidebar> {
   bool _isCasino = true;
   MenuItemType? _selectedItem = MenuItemType.allSports;
 
-  String _getIconPath(MenuItemType type, bool isSelected) {
+  String? _getIconPath(MenuItemType type, bool isSelected) {
     switch (type) {
       case MenuItemType.allSports:
         return isSelected ? AppIcons.iconHomeSelected : AppIcons.iconHome;
@@ -398,8 +398,8 @@ class _TabButton extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: RepaintBoundary(
-                  child: ImageHelper.getNetworkImage(
-                    imageUrl: isActive ? iconSelected : icon,
+                  child: ImageHelper.load(
+                    path: isActive ? iconSelected : icon,
                     width: 116,
                     height: 69,
                     fit: BoxFit.cover,
@@ -435,7 +435,7 @@ class _TabButton extends StatelessWidget {
 }
 
 class _MenuItem extends StatelessWidget {
-  final String icon;
+  final String? icon;
   final String label;
   final bool isSelected;
   final String? badge;
@@ -443,8 +443,8 @@ class _MenuItem extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _MenuItem({
-    required this.icon,
     required this.label,
+    this.icon,
     this.isSelected = false,
     this.badge,
     this.txtColorDefault,
@@ -506,15 +506,17 @@ class _MenuItem extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  RepaintBoundary(
-                    child: ImageHelper.load(
-                      path: icon,
-                      width: 20,
-                      height: 20,
-                      fit: BoxFit.cover,
+                  if (icon != null) ...[
+                    RepaintBoundary(
+                      child: ImageHelper.load(
+                        path: icon!,
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ),
-                  const Gap(8),
+                    const Gap(8),
+                  ],
                   Expanded(
                     child: Text(
                       label,
@@ -542,7 +544,7 @@ class _MenuItem extends StatelessWidget {
                         style: AppTextStyles.textStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF27231C),
+                          color: const Color(0xFF27231C),
                         ),
                       ),
                     ),

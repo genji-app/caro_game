@@ -87,6 +87,19 @@ class HashUtils {
     return md5Hash(input);
   }
 
+  /// Hash for preUseGiftCode / preUseGiftCodeWeb (paygate command)
+  /// Hash = MD5(code + HSK)
+  /// Reference: GiftCodeView.ts (legacy Cocos client)
+  ///   let hash = codeText + GameConfigManager.getHSK();
+  ///   hash = new MD5Algorithm().encrypt(hash);
+  static String createGiftCodeHash({
+    required String code,
+    required String hsk,
+  }) {
+    final input = code + hsk;
+    return md5Hash(input);
+  }
+
   /// Hash for loginHashSS / registerHashSS (unified for web and native)
   /// Hash = MD5(username + password + displayName + platformId + advId + deviceId + osVersion + bundleId + brand + secretKey)
   static String createAuthHashSS({

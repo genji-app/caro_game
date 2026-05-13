@@ -125,7 +125,7 @@ class HomeMobileContent extends ConsumerWidget {
                   Gap(8),
 
                   // Casino section - có scroll + images, cần RepaintBoundary
-                  RepaintBoundary(child: GameGroupView.outstanding()),
+                  RepaintBoundary(child: GameGroupView.featured()),
                   Gap(8),
                   // Live Casino section - static content
                   RepaintBoundary(child: GameGroupView.liveCasino()),
@@ -353,11 +353,11 @@ class _StickyLiveChatDelegate extends SliverPersistentHeaderDelegate {
       });
     }
 
-    return Container(
+    return SizedBox(
       height: maxHeight,
       child: Stack(
         children: [
-          RepaintBoundary(child: SportLiveChat(isMobile: true)),
+          const RepaintBoundary(child: SportLiveChat(isMobile: true)),
           // Gradient overlay on top when sticky
           if (isSticky)
             Positioned(

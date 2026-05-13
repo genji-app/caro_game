@@ -2,11 +2,32 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/log_helper.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 
 part 'game_player_notifier.freezed.dart';
+
+/// Categorizes the type of error for the Game Player UI to render
+/// the appropriate error widget and action.
+enum GamePlayerErrorType {
+  /// Network connectivity issue or request timeout.
+  network,
+
+  /// Session expired or authentication required.
+  sessionExpired,
+
+  /// Game is not yet released.
+  comingSoon,
+
+  /// Game has been disabled or is unavailable.
+  unavailable,
+
+  /// Server-side error that may resolve on retry.
+  serverError,
+
+  /// Unclassified error.
+  unknown,
+}
 
 /// Represents the high-level lifecycle of the Game Player.
 enum GamePlayerStatus {
@@ -44,7 +65,7 @@ enum GamePlayerStatus {
 /// - [gameUrl]       → WebView layer
 /// - [showWebView]   → WebView fade-in animation
 /// - [isLoading]     → loading overlay + back-button lock
-/// - [errorMessage]  → error overlay
+/// - [errorType]     → error overlay widget selection
 @freezed
 sealed class GamePlayerState with _$GamePlayerState {
   const GamePlayerState._(); // Required for custom getters/methods
@@ -53,7 +74,15 @@ sealed class GamePlayerState with _$GamePlayerState {
     /// Current lifecycle status of the player.
     @Default(GamePlayerStatus.initial) GamePlayerStatus status,
 
-    /// Error message to display — `null` means no error.
+    /// Categorizes the failure so the UI can render the right widget.
+    /// `null` when there is no active error.
+    GamePlayerErrorType? errorType,
+
+    /// Whether the failure allows retrying the request.
+    @Default(false) bool isRetryable,
+
+    /// Fallback display message for errors not covered by [errorType].
+    /// Primarily used by the WebView error callback.
     String? errorMessage,
 
     /// Whether the orientation is locked and ready for rendering/fetching.
@@ -73,14 +102,13 @@ sealed class GamePlayerState with _$GamePlayerState {
   }) = _GamePlayerState;
 
   /// Whether the user can pop (back) from this screen.
-  ///
-  /// Prevents accidental exits while the game is still loading.
   bool get canPop => status != GamePlayerStatus.loading;
 
-  /// Whether there's an active error or the game is in maintenance.
+  /// Whether there is an active error or the game is in maintenance.
   bool get hasError =>
       status == GamePlayerStatus.failure ||
       status == GamePlayerStatus.maintenance ||
+      errorType != null ||
       errorMessage != null;
 
   /// Whether the game is currently loading.
@@ -105,7 +133,7 @@ class GamePlayerNotifier extends StateNotifier<GamePlayerState>
     with LoggerMixin {
   GamePlayerNotifier({
     required GameBlock game,
-    required GameRepository repository,
+    required CaxiloRepository repository,
     required GameSessionGuard sessionGuard,
     this.finishLoadDelay = const Duration(milliseconds: 777),
   }) : _game = game,
@@ -116,7 +144,7 @@ class GamePlayerNotifier extends StateNotifier<GamePlayerState>
   }
 
   final GameBlock _game;
-  final GameRepository _repository;
+  final CaxiloRepository _repository;
   final GameSessionGuard _sessionGuard;
 
   /// Additional delay after WebView finishes loading before hiding the overlay.
@@ -206,24 +234,70 @@ class GamePlayerNotifier extends StateNotifier<GamePlayerState>
   void _handleLoadGameUrlError(Object e, StackTrace stackTrace) {
     if (!mounted) return;
 
-    if (e is GameMaintenanceFailure) {
-      logError('Game is under maintenance', e, stackTrace);
-      state = state.copyWith(
-        status: GamePlayerStatus.maintenance,
-        errorMessage: e.errorMessage,
-      );
-    } else if (e is GetGameUrlFailure) {
-      logError('Failed to get game URL', e, stackTrace);
-      state = state.copyWith(
-        status: GamePlayerStatus.failure,
-        errorMessage: e.errorMessage,
-      );
-    } else {
-      logError('Unexpected error while getting game URL', e, stackTrace);
-      state = state.copyWith(
-        status: GamePlayerStatus.failure,
-        errorMessage: 'Unexpected error: $e',
-      );
+    final failure = e is CaxiloFailure ? e : mapToCaxiloFailure(e);
+    logError(
+      'Game URL fetch failed: ${failure.runtimeType}',
+      failure.source ?? failure,
+      stackTrace,
+    );
+    _applyFailureState(failure);
+  }
+
+  /// Maps a [CaxiloFailure] to the correct [GamePlayerState] fields.
+  void _applyFailureState(CaxiloFailure failure) {
+    switch (failure) {
+      case CaxiloMaintenanceFailure():
+        state = state.copyWith(status: GamePlayerStatus.maintenance);
+
+      case CaxiloNetworkFailure():
+        state = state.copyWith(
+          status: GamePlayerStatus.failure,
+          errorType: GamePlayerErrorType.network,
+          isRetryable: failure.isRetryable,
+        );
+
+      case CaxiloAuthFailure():
+        state = state.copyWith(
+          status: GamePlayerStatus.failure,
+          errorType: GamePlayerErrorType.sessionExpired,
+          isRetryable: false,
+        );
+
+      case CaxiloComingSoonFailure():
+        state = state.copyWith(
+          status: GamePlayerStatus.failure,
+          errorType: GamePlayerErrorType.comingSoon,
+          isRetryable: false,
+        );
+
+      case CaxiloDisabledFailure() || CaxiloUnderDevelopmentFailure():
+        state = state.copyWith(
+          status: GamePlayerStatus.failure,
+          errorType: GamePlayerErrorType.unavailable,
+          isRetryable: false,
+        );
+
+      case CaxiloBusinessFailure(:final message):
+        state = state.copyWith(
+          status: GamePlayerStatus.failure,
+          errorType: GamePlayerErrorType.unknown,
+          errorMessage: message,
+          isRetryable: false,
+        );
+
+      case CaxiloServerFailure():
+        state = state.copyWith(
+          status: GamePlayerStatus.failure,
+          errorType: GamePlayerErrorType.serverError,
+          isRetryable: failure.isRetryable,
+        );
+
+      case CaxiloUnknownFailure():
+        state = state.copyWith(
+          status: GamePlayerStatus.failure,
+          errorType: GamePlayerErrorType.unknown,
+          isRetryable: false,
+        );
     }
   }
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 
 class GameGroupView extends ConsumerWidget {
@@ -13,8 +12,8 @@ class GameGroupView extends ConsumerWidget {
     this.horizontalPadding,
   });
 
-  const GameGroupView.outstanding({
-    this.filter = const GameFilter.byPopularity(minPlayCount: 100),
+  const GameGroupView.featured({
+    this.filter = CaxiloFilter.featured,
     super.key,
     this.onGamePressed,
     this.title = const Text('Casino nổi bật'),
@@ -23,7 +22,7 @@ class GameGroupView extends ConsumerWidget {
   });
 
   const GameGroupView.liveCasino({
-    this.filter = const GameFilter.byGameTypes(gameTypes: [GameType.live]),
+    this.filter = const CaxiloFilter.byGameTypes(gameTypes: [GameType.live]),
     super.key,
     this.onGamePressed,
     this.title = const Text('Live Casino'),
@@ -32,7 +31,7 @@ class GameGroupView extends ConsumerWidget {
   });
 
   /// The filter to apply for fetching games
-  final GameFilter filter;
+  final CaxiloFilter filter;
 
   /// Callback when a game in this group is pressed
   final void Function(GameBlock gameBlock)? onGamePressed;

@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
+import 'package:caxilo_repository/caxilo_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/log_helper.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 
@@ -47,7 +47,7 @@ class GameUrlState {
 
 /// Notifier for managing game URL state
 class GameUrlNotifier extends StateNotifier<GameUrlState> with LoggerMixin {
-  final GameRepository _repository;
+  final CaxiloRepository _repository;
 
   // Store last params for retry
   String? _lastProviderId;
@@ -56,7 +56,7 @@ class GameUrlNotifier extends StateNotifier<GameUrlState> with LoggerMixin {
   String? _lastLang;
   bool? _lastIsMobileLogin;
 
-  GameUrlNotifier({required GameRepository repository})
+  GameUrlNotifier({required CaxiloRepository repository})
     : _repository = repository,
       super(const GameUrlState()) {
     logInfo('GameUrlNotifier initialized');
@@ -99,12 +99,9 @@ class GameUrlNotifier extends StateNotifier<GameUrlState> with LoggerMixin {
 
       state = state.copyWith(url: url, status: GameUrlStatus.success);
       return url;
-    } on GetGameUrlFailure catch (e) {
+    } on CaxiloFailure catch (e) {
       logError('Failed to get game URL', e, StackTrace.current);
-      state = state.copyWith(
-        status: GameUrlStatus.error,
-        error: e.errorMessage,
-      );
+      state = state.copyWith(status: GameUrlStatus.error, error: e.toString());
       return null;
     } catch (e, stackTrace) {
       logError('Unexpected error while getting game URL', e, stackTrace);
@@ -162,6 +159,6 @@ class GameUrlNotifier extends StateNotifier<GameUrlState> with LoggerMixin {
 final gameUrlProvider = StateNotifierProvider<GameUrlNotifier, GameUrlState>((
   ref,
 ) {
-  final repository = ref.watch(gameRepositoryProvider);
+  final repository = ref.watch(caxiloRepositoryProvider);
   return GameUrlNotifier(repository: repository);
 });

@@ -71,8 +71,8 @@ class MatchCard extends StatelessWidget {
                       width: 24,
                       height: 24,
                       child: leagueLogo != null
-                          ? ImageHelper.getNetworkImage(
-                              imageUrl: leagueLogo!,
+                          ? ImageHelper.load(
+                              path: leagueLogo!,
                               width: 24,
                               height: 24,
                               fit: BoxFit.contain,

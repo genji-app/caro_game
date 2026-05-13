@@ -845,7 +845,7 @@ class ParlayStateNotifier extends StateNotifier<ParlayState> {
       debugPrint(
         '[ParlayState] addSingleBetFromPopupData: Calling calculateBet API...',
       );
-      final response = await _repository.calculateBet(request);
+      final response = await _repository.calculateBet(request, sportId: newBet.sportId);
       debugPrint(
         '[ParlayState] calculateBet response: errorCode=${response.errorCode}',
       );
@@ -1130,7 +1130,7 @@ class ParlayStateNotifier extends StateNotifier<ParlayState> {
       );
 
       debugPrint('[ParlayState] Calling calculateBet API...');
-      final response = await _repository.calculateBet(request);
+      final response = await _repository.calculateBet(request, sportId: singleBet.sportId);
       debugPrint('[ParlayState] Response errorCode: ${response.errorCode}');
       debugPrint('[ParlayState] Response minStake: ${response.minStake}');
       debugPrint('[ParlayState] Response maxStake: ${response.maxStake}');
@@ -1565,7 +1565,7 @@ class ParlayStateNotifier extends StateNotifier<ParlayState> {
         oddsStyle: _getOddsStyleCode(comboBet.oddsStyle),
       );
 
-      final response = await _repository.calculateBet(request);
+      final response = await _repository.calculateBet(request, sportId: comboBet.sportId);
 
       // Check if bet still exists
       if (index >= state.comboBets.length) {
@@ -2130,7 +2130,9 @@ final isBetInComboProvider = Provider.autoDispose.family<bool, int>((
   ref,
   eventId,
 ) {
-  return ref.watch(parlayStateProvider).isBetInCombo(eventId);
+  return ref.watch(
+    parlayStateProvider.select((state) => state.isBetInCombo(eventId)),
+  );
 });
 
 /// Provider kiểm tra selection có trong combo hay không

@@ -53,18 +53,29 @@ class _OrientationGuardState extends State<OrientationGuard> {
     final controller = _effectiveController;
     if (controller == null) return;
 
-    final result = await controller.apply(widget.policy);
+    // Use post-frame callback to ensure platform commands are sent
+    // after the frame is built and layout is stable.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (_isDisposed || !mounted) return;
 
-    if (!_isDisposed && mounted) {
-      debugPrint('OrientationGuard: Policy applied. Status: ${result.status.name}');
-    }
+      final result = await controller.apply(widget.policy);
+
+      if (!_isDisposed && mounted) {
+        debugPrint(
+          'OrientationGuard: Applied policy "${widget.policy.debugLabel ?? ''}". '
+          'Targets: ${widget.policy.targets.length}, '
+          'Status: ${result.status.name}',
+        );
+      }
+    });
   }
 
   @override
   void didUpdateWidget(covariant OrientationGuard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.policy.targets, widget.policy.targets) ||
-        oldWidget.controller != widget.controller) {
+
+    // Check for any relevant change in the policy object
+    if (oldWidget.policy != widget.policy || oldWidget.controller != widget.controller) {
       _applyPolicy();
     }
   }
@@ -102,14 +113,22 @@ class _OrientationGuardState extends State<OrientationGuard> {
       return widget.child;
     }
 
-    final currentOrientation = MediaQuery.orientationOf(context);
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) return widget.child;
+
+    final currentOrientation = mediaQuery.orientation;
     final isMatched = controller.isMatched(
       policy: widget.policy,
       currentOrientation: currentOrientation,
     );
 
-    final shouldBlock =
-        !isMatched && kIsWeb && widget.policy.blockOnWebMismatch && _isMobileOrTabletWeb(context);
+    // Only block if we have a valid non-zero size and explicitly requested.
+    final hasValidSize = mediaQuery.size.width > 0 && mediaQuery.size.height > 0;
+    final shouldBlock = hasValidSize &&
+        !isMatched &&
+        kIsWeb &&
+        widget.policy.blockOnWebMismatch &&
+        _isMobileOrTabletWeb(mediaQuery.size);
 
     return Stack(
       alignment: Alignment.center,
@@ -123,8 +142,7 @@ class _OrientationGuardState extends State<OrientationGuard> {
     );
   }
 
-  bool _isMobileOrTabletWeb(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
+  bool _isMobileOrTabletWeb(Size size) {
     return size.shortestSide < 900;
   }
 }

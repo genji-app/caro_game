@@ -229,8 +229,8 @@ class _MatchHeaderWidgetState extends State<MatchHeaderWidget>
                     children: [
                       // Background image
                       Positioned.fill(
-                        child: ImageHelper.getNetworkImage(
-                          imageUrl: _getStatisticsBackgroundImageUrl(),
+                        child: ImageHelper.load(
+                          path: _getStatisticsBackgroundImageUrl(),
                           fit: BoxFit.fill,
                         ),
                       ),

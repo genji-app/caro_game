@@ -24,7 +24,9 @@ Tài liệu này tổng hợp các quyết định kỹ thuật quan trọng, c�
 
 ## 4. Quản lý Asset/Icon Game
 - **Thay đổi Base Path**: Đã thống nhất xoá bỏ cơ cấu sử dụng prefix icon remote riêng cho game. Di dời sạch sẽ icon game về quản lý tập trung ở `assets/icons/` tại tệp `AppIcons.ASSETS_PATH`.
-- Mọi logic ánh xạ chuỗi cho Icon liên quan đến Game, Banner, Category hiện tại đều tra cứu tự động qua extension tĩnh như `GameCategoryConfigAssetX.getIconPath` theo chuẩn mới thay vì rải thẻ cứng.
+- **Centralized Game Category Domain Model**:
+   - Use `GameCategory` directly for all logic (ID, translations, icons).
+   - Logic is encapsulated within the `GameCategoryX` extension.
 
 ## 5. Quản lý Phiên Game (Game Session Guard)
 - **Vấn đề**: Một số Provider (như `amb-vn`/SEXY) chỉ cho phép **1 phiên hoạt động duy nhất mỗi user**. Nếu mở game liên tục hoặc chưa đóng hẳn phiên cũ trên server mà mở ngay phiên mới, API của Provider sẽ trả về lỗi **1028 ("Unable to proceed")**.

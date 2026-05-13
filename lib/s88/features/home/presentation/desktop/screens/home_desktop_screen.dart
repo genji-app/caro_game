@@ -38,7 +38,7 @@ class _HomeDesktopScreenState extends ConsumerState<HomeDesktopScreen> {
             Gap(12),
             HomeDesktopSportsSection(),
             Gap(12),
-            RepaintBoundary(child: GameGroupView.outstanding()),
+            RepaintBoundary(child: GameGroupView.featured()),
             HomeDesktopCasinoSection(),
             Gap(12),
             // LiveBetView(),

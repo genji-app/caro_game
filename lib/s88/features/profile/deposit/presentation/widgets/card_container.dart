@@ -6,7 +6,6 @@ import 'package:co_caro_flame/s88/core/utils/styles/app_text_styles.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/constants/deposit_constants.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/card_deposit_request.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/models/cashout_gift_card.dart';
-import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/models/cashout_gift_card_item.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/models/fetch_bank_account_data.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/providers/deposit_providers.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/providers/deposit_form_providers.dart';
@@ -62,8 +61,12 @@ class _CardContainerState extends ConsumerState<CardContainer> {
       cardFormProvider.select((state) => state.selectedCardType),
     );
     final formState = ref.watch(cardFormProvider);
-    final cardTypesAsync = ref.watch(cardTypeListProvider);
-    final denominations = ref.watch(denominationListProvider(selectedCardType));
+    // Deposit "Thẻ cào" reads from `telcos` (not `cashoutGiftCards`,
+    // which is reserved for the withdraw flow).
+    final cardTypesAsync = ref.watch(telcoListProvider);
+    final denominations = ref.watch(
+      telcoDenominationListProvider(selectedCardType),
+    );
 
     // Listen to submit state changes
     ref.listen<CardSubmitState>(cardSubmitNotifierProvider, (previous, next) {
@@ -357,11 +360,7 @@ class _CardContainerState extends ConsumerState<CardContainer> {
               child: TextField(
                 controller: _serialNumberController,
                 style: AppTextStyles.paragraphMedium(color: AppColors.gray25),
-                decoration: InputDecoration(
-                  hintText: '0000 0000 0000 0000',
-                  hintStyle: AppTextStyles.paragraphMedium(
-                    color: AppColors.gray400, // #74736f
-                  ),
+                decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -431,11 +430,7 @@ class _CardContainerState extends ConsumerState<CardContainer> {
               child: TextField(
                 controller: _cardCodeController,
                 style: AppTextStyles.paragraphMedium(color: AppColors.gray25),
-                decoration: InputDecoration(
-                  hintText: '0000 0000 0000',
-                  hintStyle: AppTextStyles.paragraphMedium(
-                    color: AppColors.gray400, // #74736f
-                  ),
+                decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -514,17 +509,25 @@ class _CardContainerState extends ConsumerState<CardContainer> {
       return;
     }
 
-    // Get deposit config to find selected card and denomination item
+    // Get deposit config. Deposit "Thẻ cào" reads telcos (NOT cashoutGiftCards).
+    // For telco rows, denominations live in `exchangeRates`, not `items`.
     final depositDataAsync = ref.read(configDepositProvider.future);
     final depositData = await depositDataAsync;
 
-    // Find selected card type
-    final selectedCard = depositData.cashoutGiftCards.firstWhere(
-      (CashoutGiftCard card) => card.name == formState.selectedCardType,
-      orElse: () => depositData.cashoutGiftCards.first,
+    if (depositData.telcos.isEmpty) {
+      if (mounted) {
+        AppToast.showError(context, message: 'Không có loại thẻ nào');
+      }
+      return;
+    }
+
+    // Find selected telco by name
+    final selectedTelco = depositData.telcos.firstWhere(
+      (CashoutGiftCard telco) => telco.name == formState.selectedCardType,
+      orElse: () => depositData.telcos.first,
     );
 
-    // Parse selected denomination to numeric value
+    // Parse selected denomination ("100,000" → 100000)
     final denominationAmount = int.tryParse(
       formState.selectedDenomination!.replaceAll(',', '').replaceAll('.', ''),
     );
@@ -539,33 +542,14 @@ class _CardContainerState extends ConsumerState<CardContainer> {
       return;
     }
 
-    // Check if items is empty
-    if (selectedCard.items.isEmpty) {
-      if (mounted) {
-        AppToast.showError(
-          context,
-          message: 'Không có mệnh giá nào cho loại thẻ này',
-        );
-      }
-      return;
-    }
-
-    // Find denomination item to get telcoId and price
-    final denominationItem = selectedCard.items.firstWhere(
-      (CashoutGiftCardItem item) =>
-          item.active && item.amount == denominationAmount,
-      orElse: () => selectedCard.items.firstWhere(
-        (CashoutGiftCardItem item) => item.active,
-        orElse: () => selectedCard.items.first,
-      ),
-    );
-
-    // Create request and call API through notifier
+    // chargeCard API requires { serial, code, telcoId, amount }.
+    //   - telcoId: id of the telco itself (selectedTelco.id)
+    //   - amount:  the user-picked denomination
     final request = CardDepositRequest(
       serial: formState.serialNumber.trim(),
       code: formState.cardCode.trim(),
-      telcoId: denominationItem.telcoId,
-      amount: denominationItem.price,
+      telcoId: selectedTelco.id,
+      amount: denominationAmount,
     );
 
     // Call provider to charge card

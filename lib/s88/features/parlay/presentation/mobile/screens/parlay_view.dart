@@ -16,7 +16,7 @@ import 'package:co_caro_flame/s88/features/parlay/presentation/mobile/widgets/pa
 import 'package:co_caro_flame/s88/features/parlay/presentation/mobile/widgets/parlay_summary_section.dart';
 import 'package:co_caro_flame/s88/features/parlay/presentation/mobile/widgets/parlay_tab_bar.dart';
 import 'package:co_caro_flame/s88/features/profile/profile.dart';
-import 'package:co_caro_flame/s88/shared/profile_navigation_system/profile_navigation_system.dart';
+import 'package:co_caro_flame/s88/shared/responsive/responsive_builder.dart';
 import 'package:co_caro_flame/s88/shared/widgets/toast/app_toast.dart';
 
 class ParlayView extends ConsumerStatefulWidget {
@@ -132,7 +132,8 @@ class _ParlayViewState extends ConsumerState<ParlayView> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Center(
-          child: _showSuccessView
+          child: 
+          _showSuccessView
               ? _buildSuccessView()
               : _showComboSuccessView
               ? _buildComboSuccessView()
@@ -383,8 +384,8 @@ class _ParlayViewState extends ConsumerState<ParlayView> {
       _successfulBets = [];
     });
     // Successful bets are already removed from state by placeAllSingleBetsParallel
-    Navigator.of(context).pop();
-    // TODO: Navigate to my bets screen
+    ref.read(myBetOverlayVisibleProvider.notifier).close();
+    _openProfileAndGoToBetHistory();
   }
 
   /// Handle removing a bet from success view
@@ -451,7 +452,24 @@ class _ParlayViewState extends ConsumerState<ParlayView> {
   Future<void> _openProfileAndGoToBetHistory() async {
     if (!mounted) return;
 
-    await ProfileNavigation.of(context).pushNamedAndRemoveUntil<void>(
+    // On mobile/tablet, ParlayView is inside a modal bottom sheet — pop it first.
+    // On desktop, it's an overlay managed by myBetOverlayVisibleProvider (already closed by caller).
+    if (!ResponsiveBuilder.isDesktop(context)) {
+      Navigator.of(context).pop();
+    }
+
+    // Use providers directly because ParlayView is inside a modal bottom sheet
+    // whose context does not have AdaptiveOverlayNavigator as an ancestor.
+    final controller = ref.read(profileOverlayControllerProvider);
+    final navigatorKey = ref.read(profileNavigatorKeyProvider);
+
+    if (!controller.isVisible) {
+      controller.open();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    await Future<void>.delayed(Duration.zero);
+
+    navigatorKey.currentState?.pushNamedAndRemoveUntil(
       ProfileRouter.bettingHistory,
       (route) => route.settings.name == ProfileRouter.root,
     );

@@ -144,6 +144,7 @@ class I18n {
   static const String txtRefunded = 'Hoàn tiền';
   static const String txtSold = 'Đã bán';
   static const String txtPending = 'Đang chờ';
+  static const String txtDeclined = 'Từ chối';
   static const String txtTransfered = 'Đã chuyển';
   static const String txtNewRequest = 'Yêu cầu mới';
 
@@ -212,4 +213,27 @@ class I18n {
   static const String txtPlayNow = 'Chơi ngay';
   static const String txtNoGamesAvailable = 'Không có trò chơi nào';
   static const String txtUnknownError = 'Lỗi không xác định';
+
+  /// Mapping for dynamic category labels
+  static const Map<String, String> translationMap = {
+    'txt_game_category_all': txtGameCategoryAll,
+    'txt_game_slots': txtGameSlots,
+    'txt_game_sports': txtGameSports,
+    'txt_game_jackpot': txtGameJackpot,
+    'txt_game_card': txtGameCard,
+    'txt_game_dice': txtGameDice,
+    'txt_game_live': txtGameLive,
+    'txt_game_lottery': txtGameLottery,
+    'txt_game_mini_game': txtGameMiniGame,
+    'txt_game_fishing': txtGameFishing,
+    'txt_game_others': txtGameOthers,
+    'txt_game_category_sunwin': txtGameCategorySunwin,
+    'txt_game_category_new_games': txtGameCategoryNewGames,
+    'txt_game_category_live_dealer': txtGameCategoryLiveDealer,
+    'txt_game_category_cards': txtGameCategoryCards,
+    'txt_game_category_casino': txtGameCategoryCasino,
+    'txt_game_category_arcade': txtGameCategoryArcade,
+    'txt_game_category_lotto': txtGameCategoryLotto,
+    'txt_game_category_fish': txtGameCategoryFish,
+  };
 }

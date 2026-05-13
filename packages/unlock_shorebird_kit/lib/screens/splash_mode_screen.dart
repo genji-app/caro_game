@@ -2,14 +2,31 @@ import 'dart:async';
 
 import 'package:unlock_shorebird_kit/flow/unlock_flow_coordinator.dart';
 import 'package:unlock_shorebird_kit/flow/unlock_shorebird_launch_coordinator.dart';
-import 'package:unlock_shorebird_kit/shorebird/shorebird_patch_preferences.dart';
-import 'package:unlock_shorebird_kit/shorebird/update/shorebird_restart_snackbar.dart';
+import 'package:unlock_shorebird_kit/shorebird/update/bloc/update_bloc.dart';
+import 'package:unlock_shorebird_kit/shorebird/update/shorebird_restart_dialog.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Host provides [executeRestartWithFade] → fade-out then [Restart.restartApp]
-/// (typically [RestartScope.executeRestartApp]). First patch: same animation,
-/// no snackbar; later patches: snackbar then same callback on tap.
+/// Key SharedPreferences lưu patch number "đã biết" từ session trước.
+/// Dùng để compare với `min_patch_force_update` ở session kế tiếp:
+/// - Nếu null → first install → silent restart.
+/// - Nếu < minForce → show snackbar.
+/// - Sau mỗi lần xử lý: update bằng currentPatch hiện tại.
+const String _kSavedPatchKey = 'shorebird_last_known_patch';
+
+/// Host provides [executeRestartWithFade] → fade-out then restart app.
+///
+/// **Quan trọng:** host PHẢI gọi restart với `terminate = true` (ví dụ
+/// `Restart.restartApp(terminate: true)`) để Shorebird thực sự apply patch
+/// trên process mới. Nếu chỉ restart widget tree (terminate=false), patch
+/// vẫn chưa được load.
+///
+/// Flow UX:
+/// - Patch đầu tiên trên binary → silent restart (không snackbar)
+/// - Patch sau đó, nếu current patch thấp hơn `min_patch_force_update`
+///   → snackbar bắt user restart. Ngược lại vào betting, patch auto apply
+///   ở lần mở kế tiếp.
 class SplashModeScreen extends StatefulWidget {
   const SplashModeScreen({
     super.key,
@@ -90,48 +107,155 @@ class _SplashModeScreenState extends State<SplashModeScreen> {
     });
   }
 
-  /// When [UpdateFlowStatus.restartRequired]: first time set prefs and restart
-  /// with fade (no snackbar); later show snackbar; tap uses the same fade + restart.
+  /// Xử lý khi Shorebird fire [UpdateFlowStatus.restartRequired].
+  ///
+  /// **Inputs:**
+  /// - `savedPatch` từ SharedPreferences (= patch session sau sẽ chạy, lưu
+  ///   từ session trước).
+  /// - `nextPatch` từ Shorebird (= patch vừa download, đang chờ restart).
+  ///   Nếu null nghĩa là KHÔNG có patch mới chờ apply.
+  /// - `currentPatch` từ Shorebird (= patch đang chạy trong VM hiện tại).
+  /// - `minPatchForceUpdate` từ remote config.
+  ///
+  /// **Logic:**
+  /// 1. **First install** (savedPatch == null): silent restart + lưu
+  ///    pendingPatch (= nextPatch ?? currentPatch).
+  /// 2. **Subsequent**: chỉ show snackbar khi CẢ 2 điều kiện đúng:
+  ///    - `nextPatch != null` (thực sự có patch mới chờ apply, không phải
+  ///      handler bị gọi không có lý do).
+  ///    - `savedPatch < minForce` (patch user đang dùng dưới threshold).
+  ///    Sau xử lý, update saved bằng pendingPatch.
   Future<void> executeHandleShorebirdRestartRequired() async {
     if (!mounted) {
       return;
     }
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final bool consumed =
-        prefs.getBool(
-          ShorebirdPatchPreferences.firstPostPatchAutoRestartConsumedKey,
-        ) ??
-        false;
-    if (!consumed) {
-      await prefs.setBool(
-        ShorebirdPatchPreferences.firstPostPatchAutoRestartConsumedKey,
-        true,
+    final int? savedPatch = prefs.getInt(_kSavedPatchKey);
+    final int? nextPatchNumber =
+        await _launchCoordinator.executeReadNextPatchNumber();
+    final int? currentPatchNumber =
+        await _launchCoordinator.executeReadCurrentPatchNumber();
+    final int? minPatchForceUpdate = _launchCoordinator.minPatchForceUpdate;
+    if (!mounted) {
+      return;
+    }
+
+    // pendingPatch = patch session SAU sẽ ở.
+    final int? pendingPatchNumber = nextPatchNumber ?? currentPatchNumber;
+
+    print(
+      '[Unlock Shorebird] handle restartRequired: '
+      'savedPatch=$savedPatch '
+      'currentPatch=$currentPatchNumber '
+      'nextPatch=$nextPatchNumber '
+      'pendingPatch=$pendingPatchNumber '
+      'minForce=$minPatchForceUpdate '
+      'silentAttempted=${UpdateBloc.isSilentRestartAttemptedInSession}',
+    );
+
+    // Nhánh 1: First install (chưa có saved patch) → silent restart.
+    if (savedPatch == null) {
+      if (pendingPatchNumber != null) {
+        await prefs.setInt(_kSavedPatchKey, pendingPatchNumber);
+        print(
+          '[Unlock Shorebird] → first install, saved=$pendingPatchNumber',
+        );
+      } else {
+        // pendingPatch null (Shorebird unavailable) — lưu 0 để session sau
+        // không bị nhầm là first install.
+        await prefs.setInt(_kSavedPatchKey, 0);
+      }
+      if (!UpdateBloc.isSilentRestartAttemptedInSession) {
+        print('[Unlock Shorebird] → attempting silent restart');
+        UpdateBloc.markSilentRestartAttempted();
+        await widget.executeRestartWithFade(context);
+        return;
+      }
+      // Silent đã thử & fail → fallback dialog (block) để user manual restart.
+      print(
+        '[Unlock Shorebird] → silent already attempted, fallback to dialog (BLOCK)',
       );
       if (!mounted) {
         return;
       }
-      await widget.executeRestartWithFade(context);
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    final int? minPatchForceUpdate = _launchCoordinator.minPatchForceUpdate;
-    final int? pendingPatchNumber =
-        await _launchCoordinator.executeReadPendingPatchNumber();
-    if (!mounted) {
-      return;
-    }
-    if (minPatchForceUpdate != null && pendingPatchNumber != null) {
-      if (pendingPatchNumber >= minPatchForceUpdate) {
-        executeSetMode(AppMode.betting);
+      await executeShowShorebirdRestartDialog(
+        context,
+        executeRestartWithFade: widget.executeRestartWithFade,
+      );
+      if (!mounted) {
         return;
       }
+      executeSetMode(AppMode.betting);
+      return;
     }
-    executeShowShorebirdRestartSnackbar(
-      context,
-      executeRestartWithFade: widget.executeRestartWithFade,
+
+    // Nhánh 2: Subsequent — block bằng modal dialog chỉ khi:
+    //   (a) thực sự có nextPatch chờ apply, VÀ
+    //   (b) savedPatch < minForce
+    final bool hasNewPatchToApply = nextPatchNumber != null;
+    final bool savedBelowMinForce =
+        minPatchForceUpdate != null && savedPatch < minPatchForceUpdate;
+    final bool shouldBlockWithDialog =
+        hasNewPatchToApply && savedBelowMinForce;
+
+    if (shouldBlockWithDialog) {
+      print(
+        '[Unlock Shorebird] ▶▶▶ ENTER branch: shouldBlockWithDialog=true '
+        '(hasNextPatch=$hasNewPatchToApply, '
+        'savedBelowMinForce=$savedBelowMinForce)',
+      );
+      print(
+        '[Unlock Shorebird] → hasNextPatch=true & savedPatch($savedPatch) < '
+        'minForce($minPatchForceUpdate) → SHOW DIALOG (BLOCK)',
+      );
+
+      // Save TRƯỚC khi show dialog để phòng widget remount fallback (sau
+      // khi user tap Restart mà TerminateRestart fail). Khi đó SplashModeScreen
+      // mới sẽ đọc savedPatch=$pendingPatchNumber → savedBelowMinForce=false
+      // → không show dialog lại → break loop.
+      if (pendingPatchNumber != null && pendingPatchNumber != savedPatch) {
+        await prefs.setInt(_kSavedPatchKey, pendingPatchNumber);
+        print(
+          '[Unlock Shorebird] → saved patch BEFORE dialog: '
+          '$savedPatch → $pendingPatchNumber',
+        );
+      }
+
+      print(
+        '[Unlock Shorebird] → calling executeShowShorebirdRestartDialog (await)',
+      );
+
+      // BLOCK: await dialog. Handler không return cho tới khi dialog đóng.
+      // Coordinator (parent) cũng block tại `await onShorebirdRestartRequired()`.
+      // Mode vẫn là splash → SplashScreen không render → không pushReplacement
+      // sang HomeScreen → dialog hiển thị đúng cách.
+      await executeShowShorebirdRestartDialog(
+        context,
+        executeRestartWithFade: widget.executeRestartWithFade,
+      );
+      // Sau khi dialog đóng (rất hiếm — chỉ khi restart fail kiểu lạ).
+      print('[Unlock Shorebird] → dialog dismissed, going to betting');
+      if (!mounted) {
+        return;
+      }
+      executeSetMode(AppMode.betting);
+      return;
+    }
+
+    print(
+      '[Unlock Shorebird] → SKIP dialog '
+      '(hasNextPatch=$hasNewPatchToApply, '
+      'savedBelowMinForce=$savedBelowMinForce)',
     );
+
+    // Không block dialog → save & vào betting bình thường.
+    if (pendingPatchNumber != null && pendingPatchNumber != savedPatch) {
+      await prefs.setInt(_kSavedPatchKey, pendingPatchNumber);
+      print(
+        '[Unlock Shorebird] → saved patch: $savedPatch → $pendingPatchNumber',
+      );
+    }
+    executeSetMode(AppMode.betting);
   }
 
   Future<bool> executeShowRetryDialog() async {

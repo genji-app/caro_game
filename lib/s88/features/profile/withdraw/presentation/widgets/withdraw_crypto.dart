@@ -209,8 +209,8 @@ class _WithdrawCryptoState extends ConsumerState<WithdrawCrypto> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(32),
               child: _isWebP(_getCryptoIconPath(widget.selectedCrypto.name))
-                  ? ImageHelper.getNetworkImage(
-                      imageUrl: _getCryptoIconPath(widget.selectedCrypto.name),
+                  ? ImageHelper.load(
+                      path: _getCryptoIconPath(widget.selectedCrypto.name),
                       width: 64,
                       height: 64,
                       fit: BoxFit.cover,

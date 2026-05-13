@@ -32,8 +32,9 @@ class SbBettingService {
   Future<Map<String, dynamic>> calculateBets(
     Map<String, dynamic> body, {
     bool isV2 = false,
+    int? sportId,
   }) async {
-    final url = SbApiEndpoints.buildCalculateBetsUrl(_bettingUrl, _sportTypeId);
+    final url = SbApiEndpoints.buildCalculateBetsUrl(_bettingUrl, sportId ?? _sportTypeId);
     final requestBody = {...body, 'token': _token, 'userId': _custId};
 
     return await SbApiClient.instance.send(
@@ -50,11 +51,12 @@ class SbBettingService {
 
   /// Calculate Parlay Bet Min/Max Stakes
   Future<Map<String, dynamic>> calculateBetsParlay(
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    int? sportId,
+  }) async {
     final url = SbApiEndpoints.buildCalculateBetsV2Url(
       _bettingUrl,
-      _sportTypeId,
+      sportId ?? _sportTypeId,
     );
     final requestBody = {...body, 'token': _token, 'userId': _custId};
 
@@ -71,17 +73,18 @@ class SbBettingService {
   }
 
   /// Place Bet
+  /// Soccer (sportId=1): includes token/userName/userId in body
+  /// Other sports: token in header only, no user fields in body
   Future<Map<String, dynamic>> placeBets(
     Map<String, dynamic> body, {
     bool isV2 = false,
+    int? sportId,
   }) async {
-    final url = SbApiEndpoints.buildPlaceBetsUrl(_bettingUrl, _sportTypeId);
-    final requestBody = {
-      ...body,
-      'token': _token,
-      'userName': _custLogin,
-      'userId': '', // Match web behavior - send empty string
-    };
+    final effectiveSportId = sportId ?? _sportTypeId;
+    final url = SbApiEndpoints.buildPlaceBetsUrl(_bettingUrl, effectiveSportId);
+    final requestBody = effectiveSportId == 1
+        ? {...body, 'token': _token, 'userName': _custLogin, 'userId': ''}
+        : {...body};
 
     return await SbApiClient.instance.send(
           url,
@@ -96,16 +99,17 @@ class SbBettingService {
   }
 
   /// Place Parlay Bet (v2 endpoint)
+  /// Soccer (sportId=1): includes token/userName/userId in body
+  /// Other sports: token in header only, no user fields in body
   Future<Map<String, dynamic>> placeBetsParlay(
-    Map<String, dynamic> body,
-  ) async {
-    final url = SbApiEndpoints.buildPlaceBetsV2Url(_bettingUrl, _sportTypeId);
-    final requestBody = {
-      ...body,
-      'token': _token,
-      'userName': _custLogin,
-      'userId': '', // Match web behavior - send empty string
-    };
+    Map<String, dynamic> body, {
+    int? sportId,
+  }) async {
+    final effectiveSportId = sportId ?? _sportTypeId;
+    final url = SbApiEndpoints.buildPlaceBetsV2Url(_bettingUrl, effectiveSportId);
+    final requestBody = effectiveSportId == 1
+        ? {...body, 'token': _token, 'userName': _custLogin, 'userId': ''}
+        : {...body};
 
     return await SbApiClient.instance.send(
           url,

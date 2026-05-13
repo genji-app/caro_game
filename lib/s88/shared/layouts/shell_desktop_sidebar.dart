@@ -1,15 +1,10 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:co_caro_flame/s88/core/services/config/sb_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:co_caro_flame/s88/core/utils/platform_utils.dart';
-import 'package:co_caro_flame/s88/core/utils/styles/app_images.dart';
-import 'package:co_caro_flame/s88/features/download_app/dialog_download_app.dart';
-import 'package:co_caro_flame/s88/shared/responsive/responsive_builder.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:gap/gap.dart';
 import 'package:co_caro_flame/s88/core/providers/main_content_provider.dart';
 import 'package:co_caro_flame/s88/core/services/adapters/sport_socket_adapter_provider.dart';
+import 'package:co_caro_flame/s88/core/services/config/sb_config.dart';
 import 'package:co_caro_flame/s88/core/services/models/api_v2/league_model_v2.dart';
 // V2 imports for navigation
 import 'package:co_caro_flame/s88/core/services/models/api_v2/sport_constants.dart'
@@ -23,14 +18,16 @@ import 'package:co_caro_flame/s88/core/utils/extensions/image_helper.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_color.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_color_styles.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_icons.dart';
+import 'package:co_caro_flame/s88/core/utils/styles/app_images.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_text_styles.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/spacing_styles.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/features/betting/betting.dart';
+import 'package:co_caro_flame/s88/features/download_app/dialog_download_app.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 import 'package:co_caro_flame/s88/shared/domain/enums/navigation_enums.dart';
 import 'package:co_caro_flame/s88/shared/widgets/cards/inner_shadow_card.dart';
 import 'package:co_caro_flame/s88/shared/widgets/toast/app_toast.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Left sidebar chung cho desktop layout
 /// Hiển thị menu và tabs Thể thao/Casino
@@ -57,7 +54,7 @@ class ShellDesktopSidebar extends ConsumerStatefulWidget {
 class _ShellDesktopSidebarState extends ConsumerState<ShellDesktopSidebar> {
   MenuItemType? _selectedItem = MenuItemType.allSports;
 
-  String _getIconPath(MenuItemType type, bool isSelected) {
+  String? _getIconPath(MenuItemType type, bool isSelected) {
     switch (type) {
       case MenuItemType.allSports:
         return isSelected ? AppIcons.iconHomeSelected : AppIcons.iconHome;
@@ -174,9 +171,7 @@ class _ShellDesktopSidebarState extends ConsumerState<ShellDesktopSidebar> {
         widget.onItemTap?.call();
         if (kIsWeb) {
           launchUrl(
-            Uri.parse(
-              SbConfig.livechatUrl,
-            ),
+            Uri.parse(SbConfig.livechatUrl),
             mode: LaunchMode.externalApplication,
           );
         } else {
@@ -184,7 +179,7 @@ class _ShellDesktopSidebarState extends ConsumerState<ShellDesktopSidebar> {
         }
         return;
       case MenuItemType.downloadApp:
-        showDialog(
+        showDialog<void>(
           context: context,
           builder: (context) => const DialogDownloadApp(),
         );
@@ -499,10 +494,7 @@ class _ShellDesktopSidebarState extends ConsumerState<ShellDesktopSidebar> {
   }
 
   /// Casino categories to show above the divider (priority items).
-  static const _casinoPriorityTypes = {GameType.jackpot};
-
-  /// Casino game types to exclude from the standard section.
-  static const _casinoExcludedTypes = {GameType.sport};
+  // Removed _casinoPriorityTypes and _casinoExcludedTypes as they are now managed by casinoSidebarCategoriesProvider.
 
   /// Update shared casino category selection and notify filter provider.
   void _updateCasinoSelection(GameCategorySelection selection) {
@@ -513,67 +505,49 @@ class _ShellDesktopSidebarState extends ConsumerState<ShellDesktopSidebar> {
 
   List<Widget> _buildCasinoMenuItems() {
     final categoryData = ref.watch(gameCategoriesProvider);
-    final categories = categoryData.categories;
+    final sidebarData = ref.watch(casinoSidebarCategoriesProvider);
     final selection = ref.watch(gameCategorySelectionProvider);
     final showShadow = widget.onTopTournamentsTapForMobile == null;
 
-    // Split categories into priority (SunWin, Jackpot) and standard groups
-    final priorityCategories = <GameCategory>[];
-    final standardCategories = <GameCategory>[];
+    Widget buildMenuItem(CaxiloCategory category) {
+      final isAll = category.id == categoryData.all.id;
+      final isSelected = isAll
+          ? selection.isEmpty
+          : selection.category?.id == category.id;
 
-    for (final category in categories) {
-      switch (category) {
-        case ProviderCategory():
-          priorityCategories.add(category);
-        case GameTypeCategory(type: final type):
-          if (_casinoPriorityTypes.contains(type)) {
-            priorityCategories.add(category);
-          } else if (!_casinoExcludedTypes.contains(type)) {
-            standardCategories.add(category);
-          }
-        case CustomCategory():
-          // Skip custom categories (e.g. New Games) in sidebar
-          break;
+      final iconPath = category.getIconPath(active: isSelected);
+
+      return _MenuItem(
+        iconKey: ValueKey('category_icon_$iconPath'),
+        icon: iconPath,
+        label: isAll ? 'Tất cả casino' : category.displayName,
+        isSelected: isSelected,
+        onTap: () => _updateCasinoSelection(
+          isAll
+              ? const GameCategorySelection()
+              : GameCategorySelection.fromCategory(category),
+        ),
+        showSelectedShadow: showShadow,
+      );
+    }
+
+    final menuItems = <Widget>[];
+
+    for (int i = 0; i < sidebarData.groups.length; i++) {
+      final group = sidebarData.groups[i];
+
+      // Add category items for the group
+      for (final category in group.categories) {
+        menuItems.add(buildMenuItem(category));
+      }
+
+      // Add a divider if it's not the last group
+      if (i < sidebarData.groups.length - 1) {
+        menuItems.add(_buildDivider());
       }
     }
 
-    return [
-      // "Tất cả casino"
-      _MenuItem(
-        icon: allCategoryConfig.getIconPath(active: selection.isEmpty),
-        label: 'Tất cả casino',
-        isSelected: selection.isEmpty,
-        onTap: () => _updateCasinoSelection(const GameCategorySelection()),
-        showSelectedShadow: showShadow,
-      ),
-      // Priority categories (SunWin, Jackpot)
-      for (final category in priorityCategories)
-        _MenuItem(
-          icon: category.getIconPath(
-            active: selection.category?.id == category.id,
-          ),
-          label: category.label,
-          isSelected: selection.category?.id == category.id,
-          onTap: () => _updateCasinoSelection(
-            GameCategorySelection.fromCategory(category),
-          ),
-          showSelectedShadow: showShadow,
-        ),
-      _buildDivider(),
-      // Standard game type categories
-      for (final category in standardCategories)
-        _MenuItem(
-          icon: category.getIconPath(
-            active: selection.category?.id == category.id,
-          ),
-          label: category.label,
-          isSelected: selection.category?.id == category.id,
-          onTap: () => _updateCasinoSelection(
-            GameCategorySelection.fromCategory(category),
-          ),
-          showSelectedShadow: showShadow,
-        ),
-    ];
+    return menuItems;
   }
 
   Widget _buildDivider() => RepaintBoundary(
@@ -670,7 +644,8 @@ class _TabButton extends StatelessWidget {
 }
 
 class _MenuItem extends StatelessWidget {
-  final String icon;
+  final String? icon;
+  final Key? iconKey;
   final String label;
   final bool isSelected;
   final String? badge;
@@ -682,8 +657,9 @@ class _MenuItem extends StatelessWidget {
   final bool showSelectedShadow;
 
   const _MenuItem({
-    required this.icon,
     required this.label,
+    this.icon,
+    this.iconKey,
     this.isSelected = false,
     this.badge,
     this.trailing,
@@ -744,15 +720,18 @@ class _MenuItem extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  RepaintBoundary(
-                    child: ImageHelper.load(
-                      path: icon,
-                      width: 20,
-                      height: 20,
-                      fit: BoxFit.cover,
+                  if (icon != null) ...[
+                    RepaintBoundary(
+                      key: iconKey,
+                      child: ImageHelper.load(
+                        path: icon!,
+                        width: 20,
+                        height: 20,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ),
-                  const Gap(8),
+                    const Gap(8),
+                  ],
                   Expanded(
                     child: Text(
                       label,
@@ -803,7 +782,7 @@ class _ExpandableSportMenuItem extends ConsumerStatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final bool showSelectedShadow;
-  final String Function(MenuItemType, bool) getIconPath;
+  final String? Function(MenuItemType, bool) getIconPath;
   final VoidCallback? onLeagueTap;
 
   final bool initExpanded;

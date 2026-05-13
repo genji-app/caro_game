@@ -145,8 +145,8 @@ class HomeTabletSportsSection extends StatelessWidget {
               ),
               // Person image - fill đầy chiều cao container
               Positioned.fill(
-                child: ImageHelper.getNetworkImage(
-                  imageUrl: imagePath,
+                child: ImageHelper.load(
+                  path: imagePath,
                   fit: BoxFit.cover,
                 ),
               ),

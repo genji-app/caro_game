@@ -4,7 +4,7 @@ import 'package:co_caro_flame/s88/features/game/shimmer/shimmer_box.dart';
 /// Shimmer loading for a single game card
 ///
 /// Reusable component that shows a shimmer placeholder for a game card.
-/// Can be used in both feed (horizontal) and grid (vertical) layouts.
+/// Can be used in both lobby (horizontal) and grid (vertical) layouts.
 class GameCardShimmer extends StatelessWidget {
   const GameCardShimmer({super.key, this.width});
 

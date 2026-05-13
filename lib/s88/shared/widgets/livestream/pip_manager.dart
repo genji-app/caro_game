@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -48,6 +49,11 @@ class PipManager {
   VoidCallback? _onFullscreenRequested;
   Widget Function(BuildContext)? _overlayControlsBuilder;
 
+  /// Play state của video trong WebView wrapper. Cập nhật qua LogChannel
+  /// khi JS fire event `playing` / `pause`. UI (Flutter) lắng nghe để
+  /// hiển thị icon play/pause đúng trạng thái.
+  final ValueNotifier<bool> isVideoPlaying = ValueNotifier(false);
+
   // ===== GETTERS =====
   bool get isPiPMode => _isPiPMode;
   bool get isLiftedToOverlay => _isLiftedToOverlay;
@@ -64,8 +70,16 @@ class PipManager {
   WebViewController? get webViewController => _webViewController;
 
   /// Load URL và tạo WebViewController (PipManager là owner duy nhất).
-  /// Nếu đã có controller và cùng URL thì không tạo mới / không reload (tránh reload khi show PiP hoặc quay lại tab).
-  /// Tắt fullscreen tự động: iOS/allowsInlineMediaPlayback=true; sau load có thể inject JS (Android) nếu cần.
+  ///
+  /// **HLS handling**: Nếu URL là stream HLS trực tiếp (`.m3u8`), WebView
+  /// load thẳng sẽ fail:
+  ///   - iOS: WKWebView bung native AVPlayer fullscreen (không có `<video
+  ///     playsinline>` wrapper để ép inline).
+  ///   - Android: WebView không native HLS → không render, còn throw
+  ///     assertion `WebViewClient.onLoadResource was null`.
+  /// → Wrap URL trong HTML local với `<video playsinline>` + hls.js.
+  ///
+  /// URL không phải m3u8 (trang HTML player của provider) → load thẳng.
   void loadUrl(String url, BuildContext context) {
     if (url.isEmpty) return;
     _context = context;
@@ -79,6 +93,12 @@ class PipManager {
           WebKitWebViewControllerCreationParams.fromPlatformWebViewControllerCreationParams(
             params,
             allowsInlineMediaPlayback: true,
+            // Chỉ yêu cầu user-gesture cho audio — video muted sẽ autoplay
+            // được. KHÔNG dùng empty set `{}` vì trigger bug force-unwrap
+            // tại `WebViewProxyAPIDelegate.swift:174`. Set khác rỗng OK.
+            mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{
+              PlaybackMediaTypes.audio,
+            },
           );
     } else if (WebViewPlatform.instance is AndroidWebViewPlatform) {
       params =
@@ -93,29 +113,303 @@ class PipManager {
       ..setBackgroundColor(const Color(0xFF000000))
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (_) => _injectDisableFullscreenScript(controller),
+          onPageFinished: (_) => _injectInlineGuardScript(controller),
+          onWebResourceError: (err) {
+            if (kDebugMode) {
+              debugPrint(
+                'PipManager WebView error: code=${err.errorCode} '
+                'type=${err.errorType} desc=${err.description}',
+              );
+            }
+          },
         ),
       )
-      ..loadRequest(Uri.parse(url));
+      // Channel để JS trong HTML wrapper log về Flutter + drive
+      // `isVideoPlaying` state cho icon play/pause trên UI.
+      ..addJavaScriptChannel(
+        'LogChannel',
+        onMessageReceived: (message) {
+          final msg = message.message;
+          if (kDebugMode) debugPrint('[LS-WebView] $msg');
+          if (msg == 'playing') {
+            isVideoPlaying.value = true;
+          } else if (msg == 'paused') {
+            isVideoPlaying.value = false;
+          }
+        },
+      );
+
+    if (_isHlsStreamUrl(url)) {
+      controller.loadHtmlString(
+        _buildInlinePlayerHtml(url),
+        // baseUrl = origin của stream (ví dụ `https://xxx.cloudfront.net`).
+        // Lý do:
+        //  1. KHÔNG để empty string — WKWebView convert → nil NSURL →
+        //     force-unwrap crash tại `WebViewProxyAPIDelegate.swift:174`.
+        //  2. KHÔNG để `https://fake.local/` — hls.js fetch segment từ
+        //     CloudFront sẽ cross-origin → có thể bị CORS block.
+        //  3. Dùng origin thật = same-origin giữa HTML và segment → CORS
+        //     không áp dụng cho hls.js fetch.
+        baseUrl: _extractOrigin(url),
+      );
+    } else {
+      controller.loadRequest(Uri.parse(url));
+    }
+
+    // Android: tắt user-gesture requirement để autoplay hoạt động.
+    final platform = controller.platform;
+    if (platform is AndroidWebViewController) {
+      platform.setMediaPlaybackRequiresUserGesture(false);
+    }
 
     _webViewController = controller;
     _updateOverlay();
   }
 
-  /// Inject JS để ép video phát inline (playsinline), giảm fullscreen tự động trên Android.
-  static Future<void> _injectDisableFullscreenScript(
+  /// URL có phải stream HLS trực tiếp không (kết thúc `.m3u8`).
+  static bool _isHlsStreamUrl(String url) {
+    final path = Uri.tryParse(url)?.path.toLowerCase() ?? url.toLowerCase();
+    return path.endsWith('.m3u8');
+  }
+
+  /// Trả về origin (scheme + host) của URL — dùng làm `baseUrl` hợp lệ cho
+  /// `loadHtmlString`. Fallback `https://localhost/` nếu URL không parse
+  /// được — vẫn là URL syntactically hợp lệ để tránh crash nil-unwrap.
+  static String _extractOrigin(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return 'https://localhost/';
+    }
+    return '${uri.scheme}://${uri.host}/';
+  }
+
+  /// HTML wrap cho stream HLS. Dùng native HLS của iOS Safari khi có
+  /// (`canPlayType('application/vnd.apple.mpegurl')`), fallback về hls.js
+  /// cho Android WebView.
+  ///
+  /// Debug: mỗi bước đều set `document.title` + gọi `LogChannel.postMessage()`
+  /// để trace được flow qua Flutter log (cần `addJavaScriptChannel` ở side
+  /// Dart — đã setup trong `loadUrl`).
+  static String _buildInlinePlayerHtml(String streamUrl) {
+    final safeUrl = jsonEncode(streamUrl);
+    return '''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;}
+video{
+  width:100%;height:100%;
+  object-fit:contain;background:#000;display:block;
+  /* Force video vào compositing layer riêng — fix bug rendering noise
+     (sọc màu YUV) trên Android WebView. TextureView compositing trên
+     Android API 23+ có thể render sai decoder surface nếu video element
+     nằm cùng layer với HTML content chính. `translate3d` và
+     `will-change` buộc browser tạo hardware layer riêng cho video. */
+  transform:translate3d(0,0,0);
+  -webkit-transform:translate3d(0,0,0);
+  will-change:transform;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+}
+video::-webkit-media-controls-fullscreen-button{display:none!important;}
+</style>
+</head>
+<body>
+<video id="v" autoplay playsinline webkit-playsinline x5-playsinline
+       preload="auto"></video>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+<script>
+(function(){
+  var v = document.getElementById('v');
+  var url = $safeUrl;
+
+  // Start muted — iOS policy yêu cầu muted để autoplay. Video giữ muted
+  // xuyên suốt vòng đời. Nếu cần audio, thêm mute/unmute button (điều
+  // khiển qua Flutter → runJavaScript) hoặc implement pattern khác.
+  v.muted = true;
+  v.defaultMuted = true;
+  v.setAttribute('muted', '');
+
+  function log(msg){
+    try { document.title = 'LS: ' + msg; } catch(_){}
+    try {
+      if (window.LogChannel && window.LogChannel.postMessage)
+        window.LogChannel.postMessage(msg);
+    } catch(_){}
+    try { console.log('[LS] ' + msg); } catch(_){}
+  }
+
+  var playing = false;
+  function attemptPlay(from){
+    if (playing) return;
+    // GIỮ muted — iOS chỉ cho autoplay khi muted. Unmute chỉ có thể từ
+    // Flutter runJavaScript (không count là WebView gesture, nhưng OK cho
+    // chỉnh mute state) hoặc nếu thêm native UI.
+    v.muted = true;
+    var p;
+    try { p = v.play(); } catch(e){ log('play-throw from=' + from + ' e=' + e); return; }
+    if (p && p.then) {
+      p.then(function(){
+        playing = true;
+        log('play-ok from=' + from);
+      }).catch(function(e){
+        log('play-reject from=' + from + ' err=' + e);
+        // Video giữ pause state, user dùng Flutter play button để resume.
+        // kỳ chỗ nào trong wrapper — xem `tapKick` bên dưới).
+      });
+    }
+  }
+
+  // Retry ở mọi event có thể play được — iOS đôi khi chần chừ giữa các
+  // trạng thái, cần gọi play() nhiều lần cho chắc.
+  ['loadstart','loadedmetadata','loadeddata','canplay','canplaythrough']
+    .forEach(function(ev){
+      v.addEventListener(ev, function(){ log(ev); attemptPlay(ev); });
+    });
+
+  v.addEventListener('playing', function(){
+    playing = true;
+    log('playing');
+  });
+  v.addEventListener('pause',    function(){ playing = false; log('paused'); });
+  v.addEventListener('waiting',  function(){ log('waiting'); });
+  v.addEventListener('stalled',  function(){ log('stalled'); });
+  v.addEventListener('error',    function(){
+    var e = v.error;
+    log('video-error code=' + (e ? e.code : '?') + ' msg=' + (e ? e.message : '?'));
+  });
+
+  // Không còn tapKick trong WebView. Trên iOS, Flutter's GestureDetector
+  // KHÔNG block được native touch xuyên xuống WKWebView (PlatformView
+  // limitation) — nếu tapKick tồn tại, user tap Flutter button sẽ:
+  //   - touchstart → WebView nhận → tapKick → v.play() → icon = pause
+  //   - tap up     → Flutter onTap → togglePlayPause → pause
+  // gây ra flicker "tap down = play, tap up = pause".
+  //
+  // Toàn bộ play/pause giờ chạy qua Flutter button (runJavaScript từ
+  // Dart). Video giữ muted xuyên suốt — audio là concern riêng, có thể
+  // thêm mute/unmute button sau nếu cần.
+
+  var canNative = v.canPlayType('application/vnd.apple.mpegurl');
+  log('canPlayType(m3u8)="' + canNative + '" hasHls=' + !!window.Hls);
+
+  if (canNative) {
+    log('path=native');
+    v.src = url;
+    v.load();
+    attemptPlay('native-initial');
+  } else if (window.Hls && window.Hls.isSupported()) {
+    log('path=hlsjs');
+    // Android WebView config: tắt worker mode (main-thread parse ổn định
+    // hơn — Web Worker trên Android WebView hay gây rendering glitch).
+    // Buffer nhỏ giảm memory, giảm chance của MSE stutter gây lỗi decoder.
+    var hls = new Hls({
+      lowLatencyMode: true,
+      enableWorker: false,
+      backBufferLength: 30,
+      maxBufferLength: 20,
+      maxMaxBufferLength: 30,
+    });
+    hls.loadSource(url);
+    hls.attachMedia(v);
+    hls.on(Hls.Events.MANIFEST_PARSED, function(){
+      log('hls-manifest-parsed');
+      attemptPlay('hls-manifest');
+    });
+    hls.on(Hls.Events.ERROR, function(_, d){
+      log('hls-error type=' + d.type + ' details=' + d.details + ' fatal=' + d.fatal);
+      if (d && d.fatal) {
+        try { hls.destroy(); } catch(_){}
+        v.src = url;
+        v.load();
+        attemptPlay('fallback');
+      }
+    });
+  } else {
+    log('path=fallback-direct');
+    v.src = url;
+    v.load();
+    attemptPlay('direct');
+  }
+})();
+</script>
+</body>
+</html>''';
+  }
+
+  /// Safety-net JS: stamp `playsinline` và gắn post-hoc fullscreen-exit cho
+  /// các page provider không phải HLS wrapper (khi `loadRequest` chạy thay
+  /// vì `loadHtmlString`). Script idempotent — không chạy lại nếu đã cài.
+  static Future<void> _injectInlineGuardScript(
     WebViewController controller,
   ) async {
-    try {
-      await controller.runJavaScript('''
-        (function() {
-          var v = document.querySelectorAll('video');
-          for (var i = 0; i < v.length; i++) {
-            v[i].setAttribute('playsinline', '');
-            v[i].setAttribute('webkit-playsinline', '');
+    const script = r'''
+      (function() {
+        if (window.__s88InlineGuardInstalled) return;
+        window.__s88InlineGuardInstalled = true;
+
+        function harden(v) {
+          if (!v || v.__inlineHardened) return;
+          v.__inlineHardened = true;
+          try {
+            v.setAttribute('playsinline', '');
+            v.setAttribute('webkit-playsinline', '');
+            v.setAttribute('x5-playsinline', '');
+            v.playsInline = true;
+          } catch (e) {}
+        }
+
+        function harvest(root) {
+          if (!root || root.nodeType !== 1) return;
+          if (root.tagName === 'VIDEO') harden(root);
+          else if (root.querySelectorAll) {
+            root.querySelectorAll('video').forEach(harden);
           }
-        })();
-      ''');
+        }
+
+        function exitFullscreenSoft() {
+          try {
+            var v = document.querySelector('video');
+            if (v && typeof v.webkitExitFullscreen === 'function') {
+              v.webkitExitFullscreen();
+            }
+          } catch (e) {}
+          try {
+            if (document.exitFullscreen && document.fullscreenElement) {
+              document.exitFullscreen().catch(function(){});
+            }
+          } catch (e) {}
+        }
+
+        function install() {
+          harvest(document.body);
+          harvest(document.documentElement);
+          document.addEventListener('webkitbeginfullscreen', exitFullscreenSoft, true);
+          document.addEventListener('fullscreenchange', function(){
+            if (document.fullscreenElement) exitFullscreenSoft();
+          });
+          var target = document.documentElement || document.body;
+          if (!target || !window.MutationObserver) return;
+          new MutationObserver(function(mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+              var added = mutations[i].addedNodes;
+              for (var j = 0; j < added.length; j++) harvest(added[j]);
+            }
+          }).observe(target, { childList: true, subtree: true });
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', install);
+        } else {
+          install();
+        }
+      })();
+    ''';
+    try {
+      await controller.runJavaScript(script);
     } catch (_) {}
   }
 
@@ -126,7 +420,36 @@ class PipManager {
   void releaseWebView() {
     _webViewController = null;
     _currentUrl = null;
+    isVideoPlaying.value = false;
     _updateOverlay();
+  }
+
+  /// Play video trong WebView. **Luôn giữ muted** khi gọi từ đây —
+  /// `runJavaScript` từ Dart không có WKWebView user-activation flag, nên
+  /// unmuted play từ native side sẽ bị iOS pause ngay lập tức (flicker
+  /// play → pause → play). Video giữ muted; nếu cần âm thanh, thêm
+  /// mute/unmute button riêng trên UI.
+  Future<void> playVideo() async {
+    await _webViewController?.runJavaScript(
+      "var v=document.getElementById('v');"
+      "if(v){v.muted=true;var p=v.play();if(p&&p.catch)p.catch(function(){});}",
+    );
+  }
+
+  /// Pause video trong WebView.
+  Future<void> pauseVideo() async {
+    await _webViewController?.runJavaScript(
+      "var v=document.getElementById('v');if(v)v.pause();",
+    );
+  }
+
+  /// Toggle play/pause dựa trên state hiện tại.
+  Future<void> togglePlayPause() async {
+    if (isVideoPlaying.value) {
+      await pauseVideo();
+    } else {
+      await playVideo();
+    }
   }
 
   // ===== PUBLIC METHODS =====

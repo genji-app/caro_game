@@ -512,7 +512,7 @@ class _LivestreamBadgePiPState extends State<_LivestreamBadgePiP> {
             child: SizedBox(
               width: 40,
               height: 26,
-              child: ImageHelper.getNetworkImage(imageUrl: AppImages.live),
+              child: ImageHelper.load(path: AppImages.live),
             ),
           ),
         ],

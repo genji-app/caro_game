@@ -293,7 +293,7 @@ class _SelectionFieldState extends State<SelectionField> {
               path: item.iconUrl!,
               width: size,
               height: size,
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               errorWidget: Center(
                 child: Icon(
                   Icons.image_not_supported,
@@ -318,33 +318,30 @@ class _SelectionFieldState extends State<SelectionField> {
 
       final iconWidget = ClipRRect(
         borderRadius: BorderRadius.circular(6),
-        child: Image.network(
-          item.iconUrl!,
+        child: ImageHelper.load(
+          path: item.iconUrl!,
           width: size,
           height: size,
           fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => Icon(
+          errorWidget: Icon(
             Icons.credit_card,
             size: size * 0.625,
             color: AppColors.gray950,
           ),
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return SizedBox(
-              width: size,
-              height: size,
-              child: Center(
-                child: SizedBox(
-                  width: size * 0.5,
-                  height: size * 0.5,
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.gray950,
-                  ),
+          placeholder: SizedBox(
+            width: size,
+            height: size,
+            child: Center(
+              child: SizedBox(
+                width: size * 0.5,
+                height: size * 0.5,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.gray950,
                 ),
               ),
-            );
-          },
+            ),
+          ),
         ),
       );
 
@@ -354,13 +351,13 @@ class _SelectionFieldState extends State<SelectionField> {
 
       // Default style with border
       return Container(
-        width: size,
-        height: size,
+        width: 30,
+        height: 30,
         margin: const EdgeInsets.only(right: 8),
         decoration: BoxDecoration(
           color: AppColors.gray25,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.gray700, width: 0.5),
+          border: Border.all(color: AppColors.gray700),
         ),
         child: iconWidget,
       );

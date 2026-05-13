@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fullscreen_guard/fullscreen_guard.dart';
 import 'package:rive/rive.dart' as rive;
+import 'package:co_caro_flame/s88/core/providers/platform_ui_provider.dart';
 import 'package:co_caro_flame/s88/core/services/auth/sb_login.dart';
 import 'package:co_caro_flame/s88/core/services/storage/sport_storage.dart';
-import 'package:co_caro_flame/s88/core/services/system_ui/system_ui.dart';
 
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  final systemUi = SystemUiService();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
-
-  // Set system UI overlay style early to prevent white screen flash
-  systemUi.setSplashSystemUIOverlayStyle();
 
   await rive.RiveNative.init();
 
@@ -27,9 +19,17 @@ void main() async {
   // Load brand config trước runApp() để SplashScreen có cdnImages ngay từ frame đầu tiên.
   await SbLogin.loadBrandConfigOnly().catchError((_) {});
 
+  final platformUiController = createPlatformUiController();
+  // platformUiController.apply(const PlatformUiConfig.systemDefault());
+  // platformUiController.apply(const PlatformUiConfig.systemDefault());
+
   runApp(
     ProviderScope(
-      overrides: [systemUiProvider.overrideWithValue(systemUi)],
+      overrides: [
+        platformUiControllerProvider.overrideWith(
+          (ref) => platformUiController,
+        ),
+      ],
       child: const App(),
     ),
   );

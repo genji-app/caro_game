@@ -22,8 +22,8 @@ class SportDesktopHeader extends ConsumerWidget implements PreferredSizeWidget {
           left: 0,
           right: 0,
           bottom: -20,
-          child: ImageHelper.getNetworkImage(
-            imageUrl: AppImages.headerShadow,
+          child: ImageHelper.load(
+            path: AppImages.headerShadow,
             fit: BoxFit.fill,
           ),
         ),
@@ -74,8 +74,8 @@ class SportDesktopHeader extends ConsumerWidget implements PreferredSizeWidget {
                     SizedBox(
                       // width: 119,
                       height: 44,
-                      child: ImageHelper.getNetworkImage(
-                        imageUrl: AppImages.backgroundBalance,
+                      child: ImageHelper.load(
+                        path: AppImages.backgroundBalance,
                         height: 44,
                         fit: BoxFit.cover,
                       ),
@@ -103,8 +103,8 @@ class SportDesktopHeader extends ConsumerWidget implements PreferredSizeWidget {
                           //   height: 36,
                           //   fit: BoxFit.contain,
                           // ),
-                          ImageHelper.getNetworkImage(
-                            imageUrl: AppImages.btnRefill,
+                          ImageHelper.load(
+                            path: AppImages.btnRefill,
                             width: 56,
                             height: 36,
                             fit: BoxFit.contain,

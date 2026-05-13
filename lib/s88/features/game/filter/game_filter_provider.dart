@@ -2,11 +2,20 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/log_helper.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 
 part 'game_filter_provider.freezed.dart';
+
+// ============================================================================
+// GameViewMode
+// ============================================================================
+
+/// Explicit view mode for the game screen.
+///
+/// - [lobby] — default state: no query, no category selected → show SDUI lobby
+/// - [filter] — active state: query or category selected → show filtered grid
+enum GameViewMode { lobby, filter }
 
 // ============================================================================
 // GameFilterStatus
@@ -49,6 +58,17 @@ sealed class GameFilterState with _$GameFilterState {
 }
 
 // ============================================================================
+// GameFilterState extension
+// ============================================================================
+
+extension GameFilterStateX on GameFilterState {
+  /// Computed view mode — single source of truth for lobby vs filter switching.
+  GameViewMode get viewMode => searchQuery.isEmpty && categorySelection.isEmpty
+      ? GameViewMode.lobby
+      : GameViewMode.filter;
+}
+
+// ============================================================================
 // GameFilterNotifier
 // ============================================================================
 
@@ -58,7 +78,7 @@ sealed class GameFilterState with _$GameFilterState {
 /// - [GameFilterView]'s grid (search + category + pagination)
 /// - Search dialog/screen's casino tab (text search only)
 ///
-/// Filter execution is delegated to [GameRepository.getGames] which reads
+/// Filter execution is delegated to [CaxiloRepository.getGames] which reads
 /// from the internal cache — no direct dependency on [allGamesProvider].
 ///
 /// **Usage:**
@@ -75,14 +95,14 @@ sealed class GameFilterState with _$GameFilterState {
 /// ```
 class GameFilterNotifier extends StateNotifier<GameFilterState>
     with LoggerMixin {
-  GameFilterNotifier({required GameRepository repository})
+  GameFilterNotifier({required CaxiloRepository repository})
     : _repository = repository,
       super(const GameFilterState()) {
     // Load initial results (empty query, no filter → all games)
     _runSearch();
   }
 
-  final GameRepository _repository;
+  final CaxiloRepository _repository;
 
   Timer? _debounceTimer;
   static const _debounceDuration = Duration(milliseconds: 400);
@@ -120,6 +140,8 @@ class GameFilterNotifier extends StateNotifier<GameFilterState>
   // ---------------------------------------------------------------------------
 
   Future<void> _runSearch() async {
+    if (state.viewMode == GameViewMode.lobby) return;
+
     state = state.copyWith(status: GameFilterStatus.loading);
     try {
       final results = await _repository.getGames(
@@ -159,5 +181,5 @@ final gameFilterProvider =
     StateNotifierProvider.autoDispose<GameFilterNotifier, GameFilterState>((
       ref,
     ) {
-      return GameFilterNotifier(repository: ref.read(gameRepositoryProvider));
+      return GameFilterNotifier(repository: ref.read(caxiloRepositoryProvider));
     });

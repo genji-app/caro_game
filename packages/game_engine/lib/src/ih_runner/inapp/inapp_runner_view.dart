@@ -83,6 +83,8 @@ class _IHInAppRunnerViewState extends State<IHInAppRunnerView> with WebMessageLi
               javaScriptEnabled: true,
               allowsInlineMediaPlayback: true,
               mediaPlaybackRequiresUserGesture: false,
+              verticalScrollBarEnabled: false,
+              horizontalScrollBarEnabled: false,
               isInspectable: kDebugMode,
               // transparentBackground: false,
 

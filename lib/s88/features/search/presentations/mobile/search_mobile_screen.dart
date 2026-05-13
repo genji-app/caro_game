@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
+import 'package:caxilo_repository/caxilo_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/image_helper.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_color_styles.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_icons.dart';

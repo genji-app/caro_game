@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/border_radius_styles.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/spacing_styles.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
@@ -12,17 +11,17 @@ import 'package:co_caro_flame/s88/shared/responsive/responsive_builder.dart';
 /// ## Initialization Flow:
 /// 1. Initialize `gameFilterProvider` (auto-initialized by Riverpod)
 /// 2. Initialize `GameCategorySelector` (manages its own internal selection state)
-/// 3. Initialize `gameFeedProvider` and fetch game data
+/// 3. Initialize `gameLobbyProvider` and fetch game data
 ///
 /// ## Display Logic:
-/// - **Default State**: Shows Feed View (games grouped by categories)
+/// - **Default State**: Shows Lobby View (games grouped by categories)
 /// - **Search/Filter Mode**: Shows Grid View (filtered results)
 ///   - Triggered when: search query is entered OR category is selected
 ///   - Shows: Paginated grid of matching games
 ///
 /// ## Components:
 /// - `GameIntroBanner`: Welcome banner
-/// - `GameFilterBar`: Search input (triggers search mode)
+/// - `GameFilterInput`: Search input (triggers search mode)
 /// - `GameCategorySelector`: Category filter (triggers filter mode via callback)
 /// - `_GameContentSwitcher`: Switches between Feed/Grid based on mode (private)
 class GameFilterView extends ConsumerStatefulWidget {
@@ -103,8 +102,8 @@ class _GameFilterViewState extends ConsumerState<GameFilterView> {
               const SliverToBoxAdapter(child: Gap(AppSpacingStyles.space400)),
 
               // Content Section
-              // Logic: Feed View (default) OR Grid View (search/filter mode)
-              _GameContentSwitcher(onGamePressed: _handleGamePress),
+              // Logic: Lobby View (default) OR Grid View (search/filter mode)
+              _GameContentArea(onGamePressed: _handleGamePress),
             ],
           ),
         ),
@@ -113,15 +112,8 @@ class _GameFilterViewState extends ConsumerState<GameFilterView> {
   }
 }
 
-/// Private widget that switches between feed view and grid view
-///
-/// **Decision Logic:**
-/// - Show Feed: When no search query AND no category selected
-/// - Show Grid: When search query exists OR category selected
-///
-/// **Note:** This is private to GameFilterView since it's only used here.
-class _GameContentSwitcher extends ConsumerWidget {
-  const _GameContentSwitcher({required this.onGamePressed});
+class _GameContentArea extends ConsumerWidget {
+  const _GameContentArea({required this.onGamePressed});
 
   final void Function(GameBlock game) onGamePressed;
 
@@ -129,18 +121,13 @@ class _GameContentSwitcher extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filterState = ref.watch(gameFilterProvider);
 
-    final isShowingFeed =
-        filterState.categorySelection.isEmpty &&
-        filterState.searchQuery.isEmpty;
-
-    if (isShowingFeed) {
-      return GameFeedView.sliver(onGamePressed: onGamePressed);
-    }
-
-    return _GameFilterResult(
-      filterState: filterState,
-      onGamePressed: onGamePressed,
-    );
+    return switch (filterState.viewMode) {
+      GameViewMode.lobby => GameLobbyView.sliver(onGamePressed: onGamePressed),
+      GameViewMode.filter => _GameFilterResult(
+        filterState: filterState,
+        onGamePressed: onGamePressed,
+      ),
+    };
   }
 }
 

@@ -44,6 +44,16 @@ class ScreenUiPolicy {
 
   /// Hide status and bottom navigation bars (fullscreen).
   final bool immersive;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ScreenUiPolicy &&
+          runtimeType == other.runtimeType &&
+          immersive == other.immersive;
+
+  @override
+  int get hashCode => immersive.hashCode;
 }
 
 /// A complete policy for how a screen should behave regarding its orientation.
@@ -82,6 +92,35 @@ class OrientationPolicy {
 
   /// Whether it supports both portrait and landscape.
   bool get isAdaptive => allowsLandscape && allowsPortrait;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrientationPolicy &&
+          runtimeType == other.runtimeType &&
+          _listEquals(targets, other.targets) && // Use content-based list equality
+          screenUi == other.screenUi &&
+          blockOnWebMismatch == other.blockOnWebMismatch &&
+          customMismatchViewBuilder == other.customMismatchViewBuilder &&
+          debugLabel == other.debugLabel;
+
+  @override
+  int get hashCode =>
+      Object.hashAll(targets) ^ // Stable hash for list contents
+      screenUi.hashCode ^
+      blockOnWebMismatch.hashCode ^
+      customMismatchViewBuilder.hashCode ^
+      debugLabel.hashCode;
+
+  bool _listEquals(List<Object?>? a, List<Object?>? b) {
+    if (a == null) return b == null;
+    if (b == null || a.length != b.length) return false;
+    if (identical(a, b)) return true;
+    for (int index = 0; index < a.length; index += 1) {
+      if (a[index] != b[index]) return false;
+    }
+    return true;
+  }
 }
 
 /// Status of the application process.

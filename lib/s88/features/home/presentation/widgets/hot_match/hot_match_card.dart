@@ -98,8 +98,8 @@ class HotMatchCard extends ConsumerWidget {
         if (match.leagueLogo.isNotEmpty)
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: ImageHelper.getNetworkImage(
-              imageUrl: match.leagueLogo,
+            child: ImageHelper.load(
+              path: match.leagueLogo,
               width: 20,
               height: 20,
               fit: BoxFit.contain,
@@ -175,8 +175,8 @@ class HotMatchCard extends ConsumerWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: logo.isNotEmpty
-              ? ImageHelper.getNetworkImage(
-                  imageUrl: logo,
+              ? ImageHelper.load(
+                  path: logo,
                   width: 40,
                   height: 40,
                   fit: BoxFit.contain,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 import 'package:co_caro_flame/s88/core/constants/i18n.dart';
 import 'package:co_caro_flame/s88/core/services/providers/auth_provider.dart';
 import 'package:co_caro_flame/s88/core/services/providers/user_provider/user_provider.dart';
@@ -9,6 +11,60 @@ import 'package:co_caro_flame/s88/features/profile/profile.dart';
 import 'package:co_caro_flame/s88/shared/profile_navigation_system/profile_navigation_system.dart';
 import 'package:co_caro_flame/s88/shared/widgets/buttons/shine_button.dart';
 import 'package:co_caro_flame/s88/shared/widgets/toast/app_toast.dart';
+
+class _AppVersionInfo extends StatefulWidget {
+  const _AppVersionInfo();
+
+  @override
+  State<_AppVersionInfo> createState() => _AppVersionInfoState();
+}
+
+class _AppVersionInfoState extends State<_AppVersionInfo> {
+  late final Future<({String version, int? patchNumber})> _future = _load();
+
+  Future<({String version, int? patchNumber})> _load() async {
+    final info = await PackageInfo.fromPlatform();
+    int? patchNumber;
+    try {
+      final updater = ShorebirdUpdater();
+      if (updater.isAvailable) {
+        final current = await updater.readCurrentPatch();
+        patchNumber = current?.number;
+      }
+    } catch (_) {
+      patchNumber = null;
+    }
+    return (
+      version: '${info.version}+${info.buildNumber}',
+      patchNumber: patchNumber,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<({String version, int? patchNumber})>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox(height: 18);
+        }
+        final data = snapshot.data!;
+        final patchText =
+            data.patchNumber != null ? ' - Patch ${data.patchNumber}' : '';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            'Versions: ${data.version}$patchText',
+            style: AppTextStyles.paragraphXSmall(
+              color: AppColorStyles.contentTertiary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        );
+      },
+    );
+  }
+}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -89,6 +145,8 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                // App version + patch info
+                const _AppVersionInfo(),
                 // Logout button
                 Container(
                   padding: const EdgeInsets.only(bottom: 20),

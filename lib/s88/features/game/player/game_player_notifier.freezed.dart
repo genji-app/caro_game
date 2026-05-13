@@ -15,7 +15,11 @@ T _$identity<T>(T value) => value;
 mixin _$GamePlayerState {
 
 /// Current lifecycle status of the player.
- GamePlayerStatus get status;/// Error message to display — `null` means no error.
+ GamePlayerStatus get status;/// Categorizes the failure so the UI can render the right widget.
+/// `null` when there is no active error.
+ GamePlayerErrorType? get errorType;/// Whether the failure allows retrying the request.
+ bool get isRetryable;/// Fallback display message for errors not covered by [errorType].
+/// Primarily used by the WebView error callback.
  String? get errorMessage;/// Whether the orientation is locked and ready for rendering/fetching.
  bool get isOrientationReady;/// Whether the WebView should be visible (controls fade-in animation).
  bool get showWebView;/// The resolved game URL to load in the WebView.
@@ -32,16 +36,16 @@ $GamePlayerStateCopyWith<GamePlayerState> get copyWith => _$GamePlayerStateCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is GamePlayerState&&(identical(other.status, status) || other.status == status)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.isOrientationReady, isOrientationReady) || other.isOrientationReady == isOrientationReady)&&(identical(other.showWebView, showWebView) || other.showWebView == showWebView)&&(identical(other.gameUrl, gameUrl) || other.gameUrl == gameUrl)&&(identical(other.isNewTabOpened, isNewTabOpened) || other.isNewTabOpened == isNewTabOpened)&&(identical(other.retryCount, retryCount) || other.retryCount == retryCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is GamePlayerState&&(identical(other.status, status) || other.status == status)&&(identical(other.errorType, errorType) || other.errorType == errorType)&&(identical(other.isRetryable, isRetryable) || other.isRetryable == isRetryable)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.isOrientationReady, isOrientationReady) || other.isOrientationReady == isOrientationReady)&&(identical(other.showWebView, showWebView) || other.showWebView == showWebView)&&(identical(other.gameUrl, gameUrl) || other.gameUrl == gameUrl)&&(identical(other.isNewTabOpened, isNewTabOpened) || other.isNewTabOpened == isNewTabOpened)&&(identical(other.retryCount, retryCount) || other.retryCount == retryCount));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,status,errorMessage,isOrientationReady,showWebView,gameUrl,isNewTabOpened,retryCount);
+int get hashCode => Object.hash(runtimeType,status,errorType,isRetryable,errorMessage,isOrientationReady,showWebView,gameUrl,isNewTabOpened,retryCount);
 
 @override
 String toString() {
-  return 'GamePlayerState(status: $status, errorMessage: $errorMessage, isOrientationReady: $isOrientationReady, showWebView: $showWebView, gameUrl: $gameUrl, isNewTabOpened: $isNewTabOpened, retryCount: $retryCount)';
+  return 'GamePlayerState(status: $status, errorType: $errorType, isRetryable: $isRetryable, errorMessage: $errorMessage, isOrientationReady: $isOrientationReady, showWebView: $showWebView, gameUrl: $gameUrl, isNewTabOpened: $isNewTabOpened, retryCount: $retryCount)';
 }
 
 
@@ -52,7 +56,7 @@ abstract mixin class $GamePlayerStateCopyWith<$Res>  {
   factory $GamePlayerStateCopyWith(GamePlayerState value, $Res Function(GamePlayerState) _then) = _$GamePlayerStateCopyWithImpl;
 @useResult
 $Res call({
- GamePlayerStatus status, String? errorMessage, bool isOrientationReady, bool showWebView, String? gameUrl, bool isNewTabOpened, int retryCount
+ GamePlayerStatus status, GamePlayerErrorType? errorType, bool isRetryable, String? errorMessage, bool isOrientationReady, bool showWebView, String? gameUrl, bool isNewTabOpened, int retryCount
 });
 
 
@@ -69,10 +73,12 @@ class _$GamePlayerStateCopyWithImpl<$Res>
 
 /// Create a copy of GamePlayerState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? errorMessage = freezed,Object? isOrientationReady = null,Object? showWebView = null,Object? gameUrl = freezed,Object? isNewTabOpened = null,Object? retryCount = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? errorType = freezed,Object? isRetryable = null,Object? errorMessage = freezed,Object? isOrientationReady = null,Object? showWebView = null,Object? gameUrl = freezed,Object? isNewTabOpened = null,Object? retryCount = null,}) {
   return _then(_self.copyWith(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as GamePlayerStatus,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as GamePlayerStatus,errorType: freezed == errorType ? _self.errorType : errorType // ignore: cast_nullable_to_non_nullable
+as GamePlayerErrorType?,isRetryable: null == isRetryable ? _self.isRetryable : isRetryable // ignore: cast_nullable_to_non_nullable
+as bool,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
 as String?,isOrientationReady: null == isOrientationReady ? _self.isOrientationReady : isOrientationReady // ignore: cast_nullable_to_non_nullable
 as bool,showWebView: null == showWebView ? _self.showWebView : showWebView // ignore: cast_nullable_to_non_nullable
 as bool,gameUrl: freezed == gameUrl ? _self.gameUrl : gameUrl // ignore: cast_nullable_to_non_nullable
@@ -160,10 +166,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( GamePlayerStatus status,  String? errorMessage,  bool isOrientationReady,  bool showWebView,  String? gameUrl,  bool isNewTabOpened,  int retryCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( GamePlayerStatus status,  GamePlayerErrorType? errorType,  bool isRetryable,  String? errorMessage,  bool isOrientationReady,  bool showWebView,  String? gameUrl,  bool isNewTabOpened,  int retryCount)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _GamePlayerState() when $default != null:
-return $default(_that.status,_that.errorMessage,_that.isOrientationReady,_that.showWebView,_that.gameUrl,_that.isNewTabOpened,_that.retryCount);case _:
+return $default(_that.status,_that.errorType,_that.isRetryable,_that.errorMessage,_that.isOrientationReady,_that.showWebView,_that.gameUrl,_that.isNewTabOpened,_that.retryCount);case _:
   return orElse();
 
 }
@@ -181,10 +187,10 @@ return $default(_that.status,_that.errorMessage,_that.isOrientationReady,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( GamePlayerStatus status,  String? errorMessage,  bool isOrientationReady,  bool showWebView,  String? gameUrl,  bool isNewTabOpened,  int retryCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( GamePlayerStatus status,  GamePlayerErrorType? errorType,  bool isRetryable,  String? errorMessage,  bool isOrientationReady,  bool showWebView,  String? gameUrl,  bool isNewTabOpened,  int retryCount)  $default,) {final _that = this;
 switch (_that) {
 case _GamePlayerState():
-return $default(_that.status,_that.errorMessage,_that.isOrientationReady,_that.showWebView,_that.gameUrl,_that.isNewTabOpened,_that.retryCount);}
+return $default(_that.status,_that.errorType,_that.isRetryable,_that.errorMessage,_that.isOrientationReady,_that.showWebView,_that.gameUrl,_that.isNewTabOpened,_that.retryCount);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -198,10 +204,10 @@ return $default(_that.status,_that.errorMessage,_that.isOrientationReady,_that.s
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( GamePlayerStatus status,  String? errorMessage,  bool isOrientationReady,  bool showWebView,  String? gameUrl,  bool isNewTabOpened,  int retryCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( GamePlayerStatus status,  GamePlayerErrorType? errorType,  bool isRetryable,  String? errorMessage,  bool isOrientationReady,  bool showWebView,  String? gameUrl,  bool isNewTabOpened,  int retryCount)?  $default,) {final _that = this;
 switch (_that) {
 case _GamePlayerState() when $default != null:
-return $default(_that.status,_that.errorMessage,_that.isOrientationReady,_that.showWebView,_that.gameUrl,_that.isNewTabOpened,_that.retryCount);case _:
+return $default(_that.status,_that.errorType,_that.isRetryable,_that.errorMessage,_that.isOrientationReady,_that.showWebView,_that.gameUrl,_that.isNewTabOpened,_that.retryCount);case _:
   return null;
 
 }
@@ -213,12 +219,18 @@ return $default(_that.status,_that.errorMessage,_that.isOrientationReady,_that.s
 
 
 class _GamePlayerState extends GamePlayerState {
-  const _GamePlayerState({this.status = GamePlayerStatus.initial, this.errorMessage, this.isOrientationReady = false, this.showWebView = false, this.gameUrl, this.isNewTabOpened = false, this.retryCount = 0}): super._();
+  const _GamePlayerState({this.status = GamePlayerStatus.initial, this.errorType, this.isRetryable = false, this.errorMessage, this.isOrientationReady = false, this.showWebView = false, this.gameUrl, this.isNewTabOpened = false, this.retryCount = 0}): super._();
   
 
 /// Current lifecycle status of the player.
 @override@JsonKey() final  GamePlayerStatus status;
-/// Error message to display — `null` means no error.
+/// Categorizes the failure so the UI can render the right widget.
+/// `null` when there is no active error.
+@override final  GamePlayerErrorType? errorType;
+/// Whether the failure allows retrying the request.
+@override@JsonKey() final  bool isRetryable;
+/// Fallback display message for errors not covered by [errorType].
+/// Primarily used by the WebView error callback.
 @override final  String? errorMessage;
 /// Whether the orientation is locked and ready for rendering/fetching.
 @override@JsonKey() final  bool isOrientationReady;
@@ -241,16 +253,16 @@ _$GamePlayerStateCopyWith<_GamePlayerState> get copyWith => __$GamePlayerStateCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _GamePlayerState&&(identical(other.status, status) || other.status == status)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.isOrientationReady, isOrientationReady) || other.isOrientationReady == isOrientationReady)&&(identical(other.showWebView, showWebView) || other.showWebView == showWebView)&&(identical(other.gameUrl, gameUrl) || other.gameUrl == gameUrl)&&(identical(other.isNewTabOpened, isNewTabOpened) || other.isNewTabOpened == isNewTabOpened)&&(identical(other.retryCount, retryCount) || other.retryCount == retryCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _GamePlayerState&&(identical(other.status, status) || other.status == status)&&(identical(other.errorType, errorType) || other.errorType == errorType)&&(identical(other.isRetryable, isRetryable) || other.isRetryable == isRetryable)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.isOrientationReady, isOrientationReady) || other.isOrientationReady == isOrientationReady)&&(identical(other.showWebView, showWebView) || other.showWebView == showWebView)&&(identical(other.gameUrl, gameUrl) || other.gameUrl == gameUrl)&&(identical(other.isNewTabOpened, isNewTabOpened) || other.isNewTabOpened == isNewTabOpened)&&(identical(other.retryCount, retryCount) || other.retryCount == retryCount));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,status,errorMessage,isOrientationReady,showWebView,gameUrl,isNewTabOpened,retryCount);
+int get hashCode => Object.hash(runtimeType,status,errorType,isRetryable,errorMessage,isOrientationReady,showWebView,gameUrl,isNewTabOpened,retryCount);
 
 @override
 String toString() {
-  return 'GamePlayerState(status: $status, errorMessage: $errorMessage, isOrientationReady: $isOrientationReady, showWebView: $showWebView, gameUrl: $gameUrl, isNewTabOpened: $isNewTabOpened, retryCount: $retryCount)';
+  return 'GamePlayerState(status: $status, errorType: $errorType, isRetryable: $isRetryable, errorMessage: $errorMessage, isOrientationReady: $isOrientationReady, showWebView: $showWebView, gameUrl: $gameUrl, isNewTabOpened: $isNewTabOpened, retryCount: $retryCount)';
 }
 
 
@@ -261,7 +273,7 @@ abstract mixin class _$GamePlayerStateCopyWith<$Res> implements $GamePlayerState
   factory _$GamePlayerStateCopyWith(_GamePlayerState value, $Res Function(_GamePlayerState) _then) = __$GamePlayerStateCopyWithImpl;
 @override @useResult
 $Res call({
- GamePlayerStatus status, String? errorMessage, bool isOrientationReady, bool showWebView, String? gameUrl, bool isNewTabOpened, int retryCount
+ GamePlayerStatus status, GamePlayerErrorType? errorType, bool isRetryable, String? errorMessage, bool isOrientationReady, bool showWebView, String? gameUrl, bool isNewTabOpened, int retryCount
 });
 
 
@@ -278,10 +290,12 @@ class __$GamePlayerStateCopyWithImpl<$Res>
 
 /// Create a copy of GamePlayerState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? status = null,Object? errorMessage = freezed,Object? isOrientationReady = null,Object? showWebView = null,Object? gameUrl = freezed,Object? isNewTabOpened = null,Object? retryCount = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? status = null,Object? errorType = freezed,Object? isRetryable = null,Object? errorMessage = freezed,Object? isOrientationReady = null,Object? showWebView = null,Object? gameUrl = freezed,Object? isNewTabOpened = null,Object? retryCount = null,}) {
   return _then(_GamePlayerState(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as GamePlayerStatus,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as GamePlayerStatus,errorType: freezed == errorType ? _self.errorType : errorType // ignore: cast_nullable_to_non_nullable
+as GamePlayerErrorType?,isRetryable: null == isRetryable ? _self.isRetryable : isRetryable // ignore: cast_nullable_to_non_nullable
+as bool,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
 as String?,isOrientationReady: null == isOrientationReady ? _self.isOrientationReady : isOrientationReady // ignore: cast_nullable_to_non_nullable
 as bool,showWebView: null == showWebView ? _self.showWebView : showWebView // ignore: cast_nullable_to_non_nullable
 as bool,gameUrl: freezed == gameUrl ? _self.gameUrl : gameUrl // ignore: cast_nullable_to_non_nullable

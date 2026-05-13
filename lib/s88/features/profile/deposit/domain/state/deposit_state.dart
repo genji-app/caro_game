@@ -210,7 +210,8 @@ sealed class CardSubmitState with _$CardSubmitState {
 sealed class GiftcodeSubmitState with _$GiftcodeSubmitState {
   const factory GiftcodeSubmitState.idle() = _GiftcodeIdle;
   const factory GiftcodeSubmitState.submitting() = _GiftcodeSubmitting;
-  const factory GiftcodeSubmitState.success() = _GiftcodeSuccess;
+  const factory GiftcodeSubmitState.success({String? message}) =
+      _GiftcodeSuccess;
   const factory GiftcodeSubmitState.error(String message) = _GiftcodeError;
 }
 

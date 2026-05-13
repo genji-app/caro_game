@@ -49,8 +49,8 @@ class _SplashScreenState extends ConsumerState<S88SplashScreen> {
             SizedBox(
               width: 200,
               height: 200,
-              child: ImageHelper.getNetworkImage(
-                imageUrl: AppImages.logoS88Home,
+              child: ImageHelper.load(
+                path: AppImages.logoS88Home,
                 width: 200,
                 height: 200,
                 fit: BoxFit.contain,
@@ -95,5 +95,5 @@ class SplashNotifier extends StateNotifier<bool> {
 }
 
 final splashProvider = StateNotifierProvider<SplashNotifier, bool>(
-  (ref) => SplashNotifier(),
+      (ref) => SplashNotifier(),
 );

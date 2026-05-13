@@ -15,6 +15,8 @@ class DepositPaymentMethodsGridWeb extends ConsumerWidget {
     final selectionState = ref.watch(depositSelectionProvider);
     final selectedMethod =
         selectionState.selectedMethod ?? PaymentMethod.codepay;
+    final showBankTab = ref.watch(hasBankAccountsProvider);
+    final showEWalletTab = ref.watch(hasEWalletsProvider);
 
     return Row(
       children: [
@@ -69,32 +71,36 @@ class DepositPaymentMethodsGridWeb extends ConsumerWidget {
             },
           ),
         ),
-        const Gap(12),
-        Expanded(
-          child: DepositPaymentMethodCard(
-            method: PaymentMethod.bank,
-            label: 'Ngân hàng',
-            isSelected: selectedMethod == PaymentMethod.bank,
-            onTap: () {
-              ref
-                  .read(depositSelectionProvider.notifier)
-                  .selectPaymentMethod(PaymentMethod.bank);
-            },
+        if (showBankTab) ...[
+          const Gap(12),
+          Expanded(
+            child: DepositPaymentMethodCard(
+              method: PaymentMethod.bank,
+              label: 'Ngân hàng',
+              isSelected: selectedMethod == PaymentMethod.bank,
+              onTap: () {
+                ref
+                    .read(depositSelectionProvider.notifier)
+                    .selectPaymentMethod(PaymentMethod.bank);
+              },
+            ),
           ),
-        ),
-        const Gap(12),
-        Expanded(
-          child: DepositPaymentMethodCard(
-            method: PaymentMethod.eWallet,
-            label: 'Ví điện tử',
-            isSelected: selectedMethod == PaymentMethod.eWallet,
-            onTap: () {
-              ref
-                  .read(depositSelectionProvider.notifier)
-                  .selectPaymentMethod(PaymentMethod.eWallet);
-            },
+        ],
+        if (showEWalletTab) ...[
+          const Gap(12),
+          Expanded(
+            child: DepositPaymentMethodCard(
+              method: PaymentMethod.eWallet,
+              label: 'Ví điện tử',
+              isSelected: selectedMethod == PaymentMethod.eWallet,
+              onTap: () {
+                ref
+                    .read(depositSelectionProvider.notifier)
+                    .selectPaymentMethod(PaymentMethod.eWallet);
+              },
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

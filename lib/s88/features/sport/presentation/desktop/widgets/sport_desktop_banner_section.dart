@@ -14,8 +14,8 @@ class SportDesktopBannerSection extends StatelessWidget {
       children: [
         Expanded(
           child: BannerJoinCard(
-            backgroundImage: ImageHelper.getNetworkImage(
-              imageUrl: AppImages.backgroundJoin,
+            backgroundImage: ImageHelper.load(
+              path: AppImages.backgroundJoin,
               fit: BoxFit.cover,
             ),
             amount: '\$50,000',
@@ -25,8 +25,8 @@ class SportDesktopBannerSection extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: BannerCard(
-            backgroundImage: ImageHelper.getNetworkImage(
-              imageUrl: AppImages.imageSoccer,
+            backgroundImage: ImageHelper.load(
+              path: AppImages.imageSoccer,
               fit: BoxFit.contain,
             ),
             title: 'Sun88',
@@ -37,8 +37,8 @@ class SportDesktopBannerSection extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: BannerCard(
-            backgroundImage: ImageHelper.getNetworkImage(
-              imageUrl: AppImages.imageTennis,
+            backgroundImage: ImageHelper.load(
+              path: AppImages.imageTennis,
               fit: BoxFit.contain,
             ),
             title: 'Tennis',

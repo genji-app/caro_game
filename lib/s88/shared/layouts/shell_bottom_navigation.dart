@@ -282,8 +282,8 @@ class MenuDrawerContent extends ConsumerWidget {
                       ref.read(mainContentProvider.notifier).goToHome();
                     },
                     child: SizedBox(
-                      child: ImageHelper.getNetworkImage(
-                        imageUrl: AppImages.logoS88Home,
+                      child: ImageHelper.load(
+                        path: AppImages.logoS88Home,
                         width: 60,
                         height: 56,
                         fit: BoxFit.contain,

@@ -1,0 +1,234 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:casino_settings/casino_settings.dart' show GameType;
+import 'game_block.dart';
+import 'game_filter.dart';
+
+part 'game_category.freezed.dart';
+
+/// {@template game_category}
+/// Represents a flexible category that can be based on:
+/// - Game type (Casino, Slots, Sports, etc.)
+/// - Provider (show all games from a specific provider)
+/// - Custom criteria (New releases, Hot games, etc.)
+///
+/// This allows the UI to display various category tabs beyond just game types.
+///
+/// ## Examples
+///
+/// ### Traditional game type category:
+/// ```dart
+/// const GameCategory.gameType(
+///   type: GameType.slot,
+///   translationKey: 'txt_game_slots',
+/// )
+/// ```
+///
+/// ### Provider-specific category:
+/// ```dart
+/// const GameCategory.provider(
+///   providerId: 'sunwin',
+///   translationKey: 'txt_game_category_sunwin',
+/// )
+/// ```
+///
+/// ### Custom "New Releases" category:
+/// ```dart
+/// const GameCategory.custom(
+///   categoryId: 'new_releases',
+///   translationKey: 'txt_game_category_new_games',
+///   filter: GameFilter.byReleaseDate(daysAgo: 30),
+/// )
+/// ```
+///
+/// ### Custom "Hot Games" category (AND logic):
+/// ```dart
+/// const GameCategory.custom(
+///   categoryId: 'hot_games',
+///   translationKey: 'txt_game_category_hot_games',
+///   filter: GameFilter.all(
+///     filters: [
+///       GameFilter.byReleaseDate(daysAgo: 7),
+///       GameFilter.byPopularity(minPlayCount: 1000),
+///     ],
+///   ),
+/// )
+/// ```
+/// {@endtemplate}
+@freezed
+sealed class GameCategory with _$GameCategory {
+  /// Category that represents "All Games" (No filtering)
+  const factory GameCategory.all({
+    @Default('txt_game_category_all') String translationKey,
+    String? icon,
+    String? iconActive,
+  }) = AllCategory;
+
+  /// Category by game type (traditional category)
+  ///
+  /// Example:
+  /// ```dart
+  /// const GameCategory.gameType(
+  ///   type: GameType.slot,
+  ///   translationKey: 'txt_game_slots',
+  ///   providerIds: ['pg_soft', 'pragmatic'],
+  /// )
+  /// ```
+  const factory GameCategory.gameType({
+    required GameType type,
+    required String translationKey,
+    String? icon,
+    String? iconActive,
+    @Default([]) List<String> providerIds,
+  }) = GameTypeCategory;
+
+  /// Category by provider (show all games from a specific provider)
+  ///
+  /// Example:
+  /// ```dart
+  /// const GameCategory.provider({
+  ///   providerId: 'sunwin',
+  ///   translationKey: 'txt_game_category_sunwin',
+  ///   icon: 'assets/providers/sunwin_logo.png',
+  ///   gameTypes: [GameType.slot, GameType.card],
+  /// })
+  /// ```
+  const factory GameCategory.provider({
+    required String providerId,
+    required String translationKey,
+    String? icon,
+    String? iconActive,
+    @Default([]) List<GameType> gameTypes,
+  }) = ProviderCategory;
+
+  /// Category for all in-house developed games
+  ///
+  /// Example:
+  /// ```dart
+  /// const GameCategory.inHouse({
+  ///   translationKey: 'txt_game_category_sunwin',
+  ///   icon: 'assets/providers/sunwin_logo.png',
+  /// })
+  /// ```
+  const factory GameCategory.inHouse({
+    required String translationKey,
+    String? icon,
+    String? iconActive,
+  }) = InHouseCategory;
+
+  /// Category by custom criteria
+  ///
+  /// Examples:
+  /// ```dart
+  /// // New releases (last 30 days)
+  /// const GameCategory.custom(
+  ///   categoryId: 'new_releases',
+  ///   translationKey: 'txt_game_category_new_games',
+  ///   filter: GameFilter.byReleaseDate(daysAgo: 30),
+  /// )
+  ///
+  /// // Hot games (recently released AND popular)
+  /// const GameCategory.custom(
+  ///   categoryId: 'hot_games',
+  ///   translationKey: 'txt_game_category_hot_games',
+  ///   filter: GameFilter.all(
+  ///     filters: [
+  ///       GameFilter.byReleaseDate(daysAgo: 7),
+  ///       GameFilter.byPopularity(minPlayCount: 1000),
+  ///     ],
+  ///   ),
+  /// )
+  ///
+  /// // Recommended (popular OR recently released)
+  /// const GameCategory.custom(
+  ///   categoryId: 'recommended',
+  ///   translationKey: 'txt_game_category_recommended',
+  ///   filter: GameFilter.any(
+  ///     filters: [
+  ///       GameFilter.byReleaseDate(daysAgo: 14),
+  ///       GameFilter.byPopularity(minPlayCount: 5000),
+  ///     ],
+  ///   ),
+  /// )
+  /// ```
+  const factory GameCategory.custom({
+    required String categoryId,
+    required String translationKey,
+    required GameFilter filter,
+    String? icon,
+    String? iconActive,
+  }) = CustomCategory;
+}
+
+/// Extension for [GameCategory] to provide utility methods and getters.
+extension GameCategoryX on GameCategory {
+  /// Get a unique identifier for this category
+  String get id => when(
+    all: (_, __, ___) => 'all',
+    gameType: (type, _, __, ___, ____) => 'type_${type.name}',
+    provider: (providerId, _, __, ___, ____) => 'provider_$providerId',
+    inHouse: (_, __, ___) => 'in_house',
+    custom: (categoryId, _, __, ___, ____) => 'custom_$categoryId',
+  );
+
+  /// Get the translation key for this category
+  String get translationKey => when(
+    all: (key, _, __) => key,
+    gameType: (_, key, __, ___, ____) => key,
+    provider: (_, key, __, ___, ____) => key,
+    inHouse: (key, _, __) => key,
+    custom: (_, key, __, ___, ____) => key,
+  );
+
+  /// Get the icon name (filename) for this category
+  /// If [active] is true, returns the active icon name
+  String? getIcon({bool active = false}) => when(
+    all: (_, icon, activeIcon) => active ? activeIcon : icon,
+    gameType: (_, __, icon, activeIcon, ____) => active ? activeIcon : icon,
+    provider: (_, __, icon, activeIcon, ____) => active ? activeIcon : icon,
+    inHouse: (_, icon, activeIcon) => active ? activeIcon : icon,
+    custom: (_, __, ___, icon, activeIcon) => active ? activeIcon : icon,
+  );
+
+  /// Converts this category into a [GameFilter].
+  GameFilter toFilter() {
+    return when(
+      all: (_, __, ___) => const GameFilter.all(filters: []),
+      gameType: (type, translationKey, icon, iconActive, providerIds) {
+        if (providerIds.isEmpty) {
+          return GameFilter.byGameTypes(gameTypes: [type]);
+        }
+        return GameFilter.all(
+          filters: [
+            GameFilter.byGameTypes(gameTypes: [type]),
+            GameFilter.byProviders(providerIds: providerIds),
+          ],
+        );
+      },
+      provider: (providerId, translationKey, icon, iconActive, gameTypes) {
+        if (gameTypes.isEmpty) {
+          return GameFilter.byProviders(providerIds: [providerId]);
+        }
+        return GameFilter.all(
+          filters: [
+            GameFilter.byProviders(providerIds: [providerId]),
+            GameFilter.byGameTypes(gameTypes: gameTypes),
+          ],
+        );
+      },
+      inHouse: (translationKey, icon, iconActive) =>
+          const GameFilter.isInHouse(),
+      custom: (categoryId, translationKey, filter, icon, iconActive) => filter,
+    );
+  }
+
+  /// Check if a game matches this category
+  bool matches(GameBlock game) {
+    return when(
+      all: (_, __, ___) => true,
+      gameType: (type, _, __, ___, ____) => game.gameType == type,
+      provider: (id, _, __, ___, ____) => game.providerId == id,
+      inHouse: (_, __, ___) => game.isInHouseGame,
+      custom: (_, __, filter, ___, ____) => filter.matches(game),
+    );
+  }
+}

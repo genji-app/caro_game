@@ -13,10 +13,7 @@ import 'models/game_api_response.dart';
 /// - status: 0 = success, non-zero = business error
 class GameApiErrorInterceptor extends Interceptor {
   @override
-  void onResponse(
-    Response<dynamic> response,
-    ResponseInterceptorHandler handler,
-  ) {
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
     // Only process JSON responses
     if (response.data is! Map<String, dynamic>) {
       return handler.next(response);
@@ -63,9 +60,7 @@ class GameApiErrorInterceptor extends Interceptor {
     // Try to parse error response body safely without try-catch
     GameApiFailureResponse<dynamic>? errorBody;
     if (err.response?.data is Map<String, dynamic>) {
-      errorBody = _safeParseFailureResponse(
-        err.response!.data as Map<String, dynamic>,
-      );
+      errorBody = _safeParseFailureResponse(err.response!.data as Map<String, dynamic>);
     }
 
     final gameException = GameApiException(
@@ -92,9 +87,7 @@ class GameApiErrorInterceptor extends Interceptor {
   /// Safely parse failure response without using try-catch
   ///
   /// Validates each field manually to avoid exceptions during parsing.
-  GameApiFailureResponse<dynamic>? _safeParseFailureResponse(
-    Map<String, dynamic> json,
-  ) {
+  GameApiFailureResponse<dynamic>? _safeParseFailureResponse(Map<String, dynamic> json) {
     // Extract and validate fields manually
     final message = json['message'] is String ? json['message'] as String : 'Unknown error';
 
@@ -109,11 +102,6 @@ class GameApiErrorInterceptor extends Interceptor {
     final data = json['data'];
 
     // Create GameApiFailureResponse with validated fields
-    return GameApiFailureResponse(
-      message: message,
-      code: code,
-      status: status,
-      data: data,
-    );
+    return GameApiFailureResponse(message: message, code: code, status: status, data: data);
   }
 }

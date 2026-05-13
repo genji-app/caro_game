@@ -44,8 +44,8 @@ class ShellTabletHeader extends ConsumerWidget implements PreferredSizeWidget {
             left: 50,
             right: 50,
             bottom: 20,
-            child: ImageHelper.getNetworkImage(
-              imageUrl: AppImages.headerShadow,
+            child: ImageHelper.load(
+              path: AppImages.headerShadow,
               fit: BoxFit.fill,
             ),
           ),

@@ -274,9 +274,7 @@ class _HomeDesktopContent extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1140, minWidth: 960),
         child: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(
-            context,
-          ).copyWith(scrollbars: false),
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
           child: const SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,7 +285,7 @@ class _HomeDesktopContent extends StatelessWidget {
                 Gap(12),
                 HomeDesktopSportsSection(),
                 Gap(12),
-                RepaintBoundary(child: GameGroupView.outstanding()),
+                RepaintBoundary(child: GameGroupView.featured()),
                 Gap(12),
                 LiveBetView(),
                 Gap(12),

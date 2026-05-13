@@ -76,8 +76,8 @@ class _LandingPageState extends ConsumerState<LandingPage> {
             top: 0,
             left: 0,
             right: 0,
-            child: ImageHelper.getNetworkImage(
-              imageUrl: AppImages.headerShadow,
+            child: ImageHelper.load(
+              path: AppImages.headerShadow,
               fit: BoxFit.fill,
             ),
           ),
@@ -87,8 +87,8 @@ class _LandingPageState extends ConsumerState<LandingPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Logo
-                ImageHelper.getNetworkImage(
-                  imageUrl: AppImages.logoS88Home,
+                ImageHelper.load(
+                  path: AppImages.logoS88Home,
                   width: 200,
                   height: 80,
                   fit: BoxFit.contain,

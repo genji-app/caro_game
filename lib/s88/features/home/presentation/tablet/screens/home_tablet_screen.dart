@@ -47,7 +47,7 @@ class HomeTabletContent extends ConsumerWidget {
                 Gap(12),
                 HomeDesktopSportsSection(),
                 Gap(12),
-                RepaintBoundary(child: GameGroupView.outstanding()),
+                RepaintBoundary(child: GameGroupView.featured()),
                 Gap(12),
                 // LiveBetView(),
                 // Gap(12),

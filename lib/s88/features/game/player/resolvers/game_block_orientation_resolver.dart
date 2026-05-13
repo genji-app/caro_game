@@ -1,8 +1,8 @@
+import 'package:caxilo_repository/caxilo_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orientation_guard/orientation_guard.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 
 /// Provider for [GameBlockOrientationResolver].
 final gameBlockOrientationResolverProvider = Provider(
@@ -39,7 +39,9 @@ class GameBlockOrientationResolver
           GameOrientation.landscapeRight => DeviceOrientation.landscapeRight,
         };
       }).toList(),
-      screenUi: ScreenUiPolicy(immersive: game.forceLandscapeViewportOnIpad),
+      screenUi: ScreenUiPolicy(
+        immersive: isActuallyMobile || game.forceLandscapeViewportOnIpad,
+      ),
       debugLabel: 'GameBlock(${game.providerId} / isMobile: $isActuallyMobile)',
     );
   }

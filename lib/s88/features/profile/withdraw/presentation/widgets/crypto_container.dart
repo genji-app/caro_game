@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gap/gap.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/image_helper.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_text_styles.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/models/crypto_deposit_option.dart';
@@ -10,6 +11,7 @@ import 'package:co_caro_flame/s88/core/utils/styles/app_images.dart';
 import 'package:co_caro_flame/s88/shared/responsive/responsive_builder.dart';
 import 'package:co_caro_flame/s88/features/profile/withdraw/presentation/widgets/withdraw_crypto.dart';
 import 'package:co_caro_flame/s88/features/profile/withdraw/domain/models/withdraw_crypto_option.dart';
+import 'package:co_caro_flame/s88/shared/widgets/scoin_icon.dart';
 
 /// Crypto container for withdraw
 class WithdrawCryptoContainer extends ConsumerStatefulWidget {
@@ -63,7 +65,7 @@ class _WithdrawCryptoContainerState
   /// Example: 86548696 -> "₫86,548,696"
   String _formatPrice(int price) {
     final formatted = _formatAmount(price);
-    return '₫$formatted';
+    return formatted;
   }
 
   /// Convert CryptoDepositOption to WithdrawCryptoOption
@@ -301,8 +303,8 @@ class _WithdrawCryptoContainerState
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: _isWebP(_getCryptoIconPath(crypto.name))
-                        ? ImageHelper.getNetworkImage(
-                            imageUrl: _getCryptoIconPath(crypto.name),
+                        ? ImageHelper.load(
+                            path: _getCryptoIconPath(crypto.name),
                             width: 40,
                             height: 40,
                             fit: BoxFit.cover,
@@ -336,12 +338,16 @@ class _WithdrawCryptoContainerState
                     ],
                   ),
                 ),
-                Text(
-                  crypto.price,
-                  style: AppTextStyles.paragraphMedium(
-                    color: AppColors.yellow300,
-                  ),
-                  textAlign: TextAlign.right,
+                Row(
+                  children: [
+                    Text(
+                      crypto.price,
+                      style: AppTextStyles.paragraphMedium(
+                        color: AppColors.yellow300, // #fde272
+                      ),
+                    ),
+                    const Row(children: [Gap(4), SCoinIcon()]),
+                  ],
                 ),
               ],
             ),

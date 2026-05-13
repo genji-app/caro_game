@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:co_caro_flame/s88/core/providers/live_chat_expanded_provider.dart';
+import 'package:co_caro_flame/s88/core/providers/scroll_hide_provider.dart';
 import 'package:co_caro_flame/s88/core/services/providers/auth_provider.dart';
 import 'package:co_caro_flame/s88/core/services/providers/events_v2_filter_provider.dart';
 import 'package:co_caro_flame/s88/core/services/providers/league_provider.dart';
@@ -21,7 +22,8 @@ import 'package:co_caro_flame/s88/features/sport/presentation/widgets/sport_live
 import 'package:co_caro_flame/s88/shared/domain/enums/league_enums.dart';
 import 'package:co_caro_flame/s88/core/services/models/league_model.dart';
 import 'package:co_caro_flame/s88/shared/widgets/livestream/pip_manager.dart';
-import 'package:co_caro_flame/s88/shared/widgets/sport/match/match_row_shared_v2.dart' show extractCurrentSet;
+import 'package:co_caro_flame/s88/shared/widgets/sport/match/match_row_shared_v2.dart'
+    show extractCurrentSet;
 
 /// Mobile Bet Detail V2 screen with new design.
 ///
@@ -47,6 +49,14 @@ class _BetDetailMobileV2ScreenState
   // Chiều cao của live chat - phải khớp với SportLiveChat
   static const double _collapsedHeight = 100.0;
   static const double _expandedHeight = 200.0;
+
+  // Chiều cao xấp xỉ của MobileStatisticsTableWidget khi fake-sticky.
+  // Dùng để tính tabsStickyTop khi Statistics Table đang sticky ở đỉnh.
+  static const double _statisticsTableApproxHeight = 140.0;
+
+  // Khoảng đệm trừ đi khi so sánh offsetY của Statistics Table với
+  // liveChatTop — để sticky kích hoạt hơi sớm một chút, tránh nháy.
+  static const double _statisticsStickyThreshold = 20.0;
 
   // ScrollController và GlobalKey cho fake sticky technique
   final ScrollController _scrollController = ScrollController();
@@ -133,65 +143,61 @@ class _BetDetailMobileV2ScreenState
   // bool get _isVideoWorking =>
   //     _currentTab == MatchTab.live && PipManager().hasContent;
 
-  /// Handle scroll để detect khi Statistics Table và Bet Tabs cần sticky
-  /// Pattern giống fake_sticky.dart: check offsetY của widget B
-  /// Và tự động chuyển sang PiP mode khi scroll quá 60% của VideoPlayer
-  /// Chỉ active sticky khi video working (tab Trực tuyến + video đã load)
+  /// Handle scroll: fake-sticky cho Statistics Table + Bet Tabs,
+  /// đồng thời trigger auto-PiP khi scroll quá 60% trên tab "Trực tuyến".
   void _handleScroll() {
     _handleScrollAutoPiP();
 
-    // if (!_isVideoWorking) {
-    //   if (_isStatisticsSticky || _isBetTabsSticky) {
-    //     setState(() {
-    //       _isStatisticsSticky = false;
-    //       _isBetTabsSticky = false;
-    //     });
-    //   }
-    //   return;
-    // }
+    final topPadding = MediaQuery.of(context).padding.top;
+    final isAuthenticated = ref.read(isAuthenticatedProvider);
+    final liveChatHeight = ref.read(liveChatExpandedProvider)
+        ? _expandedHeight
+        : _collapsedHeight;
+    final liveChatTop = topPadding + (isAuthenticated ? liveChatHeight : 0);
 
-    final context = _statisticsTableKey.currentContext;
-    if (context == null) return;
+    _updateStatisticsSticky(liveChatTop);
+    _updateBetTabsSticky(liveChatTop);
+  }
 
-    final box = context.findRenderObject() as RenderBox?;
+  /// Statistics Table chỉ render khi ở tab "Bảng điểm". Nếu context null →
+  /// tab khác đang active → force tắt sticky để tránh fake sticky "dính"
+  /// che mất header.
+  void _updateStatisticsSticky(double liveChatTop) {
+    final statsContext = _statisticsTableKey.currentContext;
+    if (statsContext == null) {
+      if (_isStatisticsSticky) {
+        setState(() => _isStatisticsSticky = false);
+      }
+      return;
+    }
+
+    final box = statsContext.findRenderObject() as RenderBox?;
     if (box == null) return;
 
     final offsetY = box.localToGlobal(Offset.zero).dy;
-    final topPadding = MediaQuery.of(context).padding.top;
-    final isAuthenticated = ref.read(isAuthenticatedProvider);
-    final isExpanded = ref.read(liveChatExpandedProvider);
-    final liveChatHeight = isExpanded ? _expandedHeight : _collapsedHeight;
-    final liveChatTop = topPadding + (isAuthenticated ? liveChatHeight : 0);
-
-    // Khi Statistics Table scroll lên đến vị trí Live Chat, cần sticky
-    final shouldStatisticsSticky = offsetY < liveChatTop - 20;
-
-    if (shouldStatisticsSticky != _isStatisticsSticky) {
-      setState(() {
-        _isStatisticsSticky = shouldStatisticsSticky;
-      });
+    final shouldSticky = offsetY < liveChatTop - _statisticsStickyThreshold;
+    if (shouldSticky != _isStatisticsSticky) {
+      setState(() => _isStatisticsSticky = shouldSticky);
     }
+  }
 
-    // Check Bet Tabs sticky
+  /// Bet Tabs độc lập với Statistics Table để vẫn sticky đúng trên mọi tab.
+  /// Khi Statistics đang sticky ở đỉnh, Bet Tabs stack bên dưới nó.
+  void _updateBetTabsSticky(double liveChatTop) {
     final tabsContext = _betTabsKey.currentContext;
-    if (tabsContext != null) {
-      final tabsBox = tabsContext.findRenderObject() as RenderBox?;
-      if (tabsBox != null) {
-        final tabsOffsetY = tabsBox.localToGlobal(Offset.zero).dy;
-        // Bet Tabs sticky khi scroll lên đến vị trí Statistics Table (nếu Statistics Table đã sticky)
-        // Hoặc scroll lên đến vị trí Live Chat (nếu Statistics Table chưa sticky)
-        final statisticsTableHeight = 140.0; // Approximate height
-        final tabsStickyTop = _isStatisticsSticky
-            ? liveChatTop + statisticsTableHeight
-            : liveChatTop;
-        final shouldTabsSticky = tabsOffsetY <= tabsStickyTop;
+    if (tabsContext == null) return;
 
-        if (shouldTabsSticky != _isBetTabsSticky) {
-          setState(() {
-            _isBetTabsSticky = shouldTabsSticky;
-          });
-        }
-      }
+    final tabsBox = tabsContext.findRenderObject() as RenderBox?;
+    if (tabsBox == null) return;
+
+    final tabsOffsetY = tabsBox.localToGlobal(Offset.zero).dy;
+    final tabsStickyTop = _isStatisticsSticky
+        ? liveChatTop + _statisticsTableApproxHeight
+        : liveChatTop;
+    final shouldSticky = tabsOffsetY <= tabsStickyTop;
+
+    if (shouldSticky != _isBetTabsSticky) {
+      setState(() => _isBetTabsSticky = shouldSticky);
     }
   }
 
@@ -297,9 +303,38 @@ class _BetDetailMobileV2ScreenState
     });
   }
 
+  /// Sau khi user toggle một drawer (collapse / expand), content size thay
+  /// đổi. Nếu sau khi collapse mà content không còn đủ scroll range để kéo
+  /// shell header trở lại (maxScrollExtent < maxOffset), force show header
+  /// để tránh bị kẹt.
+  ///
+  /// Chạy qua post-frame callback để đợi layout mới apply xong, vì
+  /// [ExpandableMarketCard] render child bằng `if (isExpanded)` → size đổi
+  /// ngay frame sau state change (không có animation).
+  void _checkHeaderRevealableAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_scrollController.hasClients) return;
+      ref
+          .read(scrollHideProvider)
+          .ensureRevealableOrShow(_scrollController.position);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+
+    // Theo dõi mọi thay đổi về danh sách drawer (collapse / expand / filter
+    // đổi → list drawers thay đổi). Mỗi lần đổi, schedule check header
+    // revealability. Đây là safety net bổ sung cho
+    // ScrollMetricsNotification — một số trường hợp content chỉ hơi dài hơn
+    // viewport 1-66px, notification báo canScroll=true nhưng user vẫn không
+    // kéo nổi header về được.
+    ref.listen<List<MarketDrawerDataV2>>(
+      betDetailMobileV2Provider.select((state) => state.filteredDrawers),
+      (_, __) => _checkHeaderRevealableAfterLayout(),
+    );
 
     return Scaffold(
       backgroundColor: AppColorStyles.backgroundPrimary,
@@ -448,10 +483,31 @@ class _BetDetailMobileV2ScreenState
                     onTabChanged: (tab) {
                       setState(() {
                         _currentTab = tab;
+                        // Reset sticky state khi chuyển khỏi tab "Bảng điểm".
+                        // Lý do: Statistics Table chỉ được render trên tab
+                        // scoreboard. Nếu user đang có sticky active rồi tap
+                        // qua tab "Trực tuyến" / "Theo dõi", `_handleScroll`
+                        // sẽ không thể tự tắt sticky được (vì context của
+                        // _statisticsTableKey null) → fake sticky header sẽ
+                        // bị "dính" che mất nội dung và không hiện lại được.
+                        if (tab != MatchTab.scoreboard &&
+                            tab != MatchTab.statistics) {
+                          _isStatisticsSticky = false;
+                          _isBetTabsSticky = false;
+                        }
                       });
                       // Bảng điểm → Trực tuyến: overlay → embedded (PiP về trong container, remove overlay).
                       if (tab == MatchTab.live) {
                         PipManager().returnToContainer();
+                      }
+                      // Khi quay lại tab "Bảng điểm", tính lại sticky state
+                      // dựa trên scroll position hiện tại (user có thể đã
+                      // scroll xuống từ trước).
+                      if (tab == MatchTab.scoreboard ||
+                          tab == MatchTab.statistics) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) _handleScroll();
+                        });
                       }
                     },
                   ),
@@ -518,10 +574,11 @@ class _BetDetailMobileV2ScreenState
     bool isAuthenticated,
     double liveChatHeight,
   ) {
+    final liveChatTop = topPadding + (isAuthenticated ? liveChatHeight : 0);
     return Positioned(
       top: _isStatisticsSticky
-          ? topPadding + (isAuthenticated ? liveChatHeight : 0) + 140.0
-          : topPadding + (isAuthenticated ? liveChatHeight : 0),
+          ? liveChatTop + _statisticsTableApproxHeight
+          : liveChatTop,
       left: 0,
       right: 0,
       child: Offstage(

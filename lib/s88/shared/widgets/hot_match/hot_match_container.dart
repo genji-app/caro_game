@@ -490,8 +490,8 @@ class HotMatchContainer extends ConsumerWidget {
     ),
     child: ClipOval(
       child: logoUrl.isNotEmpty
-          ? ImageHelper.getNetworkImage(
-              imageUrl: logoUrl,
+          ? ImageHelper.load(
+              path: logoUrl,
               width: size,
               height: size,
               fit: BoxFit.cover,
@@ -623,7 +623,11 @@ class HotMatchContainer extends ConsumerWidget {
     String homePointsLabel;
     String awayPointsLabel;
 
-    if (pointsValue <= 0) {
+    if (pointsValue == 0) {
+      // Kèo cân: cả 2 bên hiển thị "0", không thêm dấu trừ (tránh "-0").
+      homePointsLabel = formattedPoints; // "0"
+      awayPointsLabel = formattedPoints; // "0"
+    } else if (pointsValue < 0) {
       // Home được chấp
       homePointsLabel = formattedPoints; // "0.5"
       awayPointsLabel = '-$formattedPoints'; // "-0.5"

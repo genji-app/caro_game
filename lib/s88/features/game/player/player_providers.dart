@@ -1,7 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:co_caro_flame/s88/core/services/providers/user_provider/user_provider.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
-import 'package:co_caro_flame/s88/core/services/system_ui/system_ui.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 
 // ---------------------------------------------------------------------------
@@ -21,9 +19,8 @@ final gameSessionGuardProvider = Provider<GameSessionGuard>((ref) {
 /// `family` scopes one notifier instance per game.
 final gamePlayerProvider = StateNotifierProvider.autoDispose
     .family<GamePlayerNotifier, GamePlayerState, GameBlock>((ref, game) {
-      final repository = ref.read(gameRepositoryProvider);
+      final repository = ref.read(caxiloRepositoryProvider);
       final userNotifier = ref.read(userProvider.notifier);
-      final systemUi = ref.read(systemUiProvider);
       final sessionGuard = ref.read(gameSessionGuardProvider);
 
       ref.onDispose(() {
@@ -31,13 +28,8 @@ final gamePlayerProvider = StateNotifierProvider.autoDispose
           sessionGuard.onSessionEnded(game.providerId);
         }
 
-        // Auto restore mobile-specific system UI when the game screen pops
-        systemUi.restoreDefaultSystemUI();
-
-        // Refresh balance after exiting the game so the main screen
-        // always shows the latest balance without requiring manual pull-to-refresh.
-        // We use Future.microtask to defer the call out of the dispose() lifecycle,
-        // avoiding Riverpod's "modifying provider while widget tree is disposing" error.
+        // Refresh balance after game exit.
+        // System UI restoration is handled by FullscreenRequired widget dispose.
         Future.microtask(() {
           userNotifier.refreshBalance();
         });

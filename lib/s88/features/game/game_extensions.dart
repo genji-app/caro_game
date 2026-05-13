@@ -1,61 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:co_caro_flame/s88/core/constants/i18n.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_icons.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_images.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 
-/// UI extensions for [GameCategory] to simplify asset path building.
-extension GameCategoryAssetX on GameCategory {
+/// {@template game_category_asset_x}
+/// UI extensions for [CaxiloCategory] to simplify asset path building.
+/// {@endtemplate}
+extension GameCategoryAssetX on CaxiloCategory {
   /// Returns the full asset path for the category icon.
+  ///
   /// If [active] is true, returns the active version of the icon.
-  String getIconPath({bool active = false}) {
+  ///
+  /// Icons are retrieved from [AppIcons.REMOTE_PATH].
+  String? getIconPath({bool active = false}) {
     final iconName = getIcon(active: active);
 
-    // Fallback to default "All" icon if specific icon is not found
-    final effectiveIconName =
-        iconName ??
-        (active ? allCategoryConfig.iconActive : allCategoryConfig.icon);
+    if (iconName == null || iconName.isEmpty) return null;
 
-    return '${AppIcons.REMOTE_PATH}/$effectiveIconName';
+    return '${AppIcons.REMOTE_PATH}/$iconName';
   }
 
-  /// Converts this category into a [GameFilter].
-  GameFilter toFilter() {
-    return when(
-      gameType: (type, label, icon, iconActive, count, providerIds) {
-        if (providerIds.isEmpty) {
-          return GameFilter.byGameTypes(gameTypes: [type]);
-        }
-        return GameFilter.all(
-          filters: [
-            GameFilter.byGameTypes(gameTypes: [type]),
-            GameFilter.byProviders(providerIds: providerIds),
-          ],
-        );
-      },
-      provider: (providerId, label, icon, iconActive, count, gameTypes) {
-        if (gameTypes.isEmpty) {
-          return GameFilter.byProviders(providerIds: [providerId]);
-        }
-        return GameFilter.all(
-          filters: [
-            GameFilter.byProviders(providerIds: [providerId]),
-            GameFilter.byGameTypes(gameTypes: gameTypes),
-          ],
-        );
-      },
-      custom: (categoryId, label, filter, icon, iconActive, count) => filter,
-    );
-  }
-}
+  /// Whether this category has an icon defined.
+  bool get hasIcon =>
+      getIconPath() != null || getIconPath(active: true) != null;
 
-/// UI extensions for [GameCategoryConfig] to simplify asset path building.
-extension GameCategoryConfigAssetX on GameCategoryConfig {
-  /// Returns the full asset path for the category config icon.
-  String getIconPath({bool active = false}) {
-    return '${AppIcons.REMOTE_PATH}/${active ? iconActive : icon}';
-  }
+  /// Returns the localized display name for this category.
+  String get displayName =>
+      I18n.translationMap[translationKey] ?? translationKey;
 }
 
 /// UI extensions for [GameBlock] record to simplify asset path building.
@@ -65,13 +37,14 @@ extension GameBlockX on GameBlock {
   String get imagePath {
     // Note: We only store the filename in the repository logic.
     // The actual storage location is controlled here (CDN game thumbs).
+    // return 'assets/images/game_assets/$image';
     return '${AppImages.IMAGES_GAME_REMOTE_PATH}/$image';
   }
 
   /// Generates a unique, deterministic [ValueKey] for this game.
   ///
   /// The [prefix] helps avoid collisions when the same game appears
-  /// in multiple places (e.g., 'GameGridView', 'GameFeedView').
+  /// in multiple places (e.g., 'GameGridView', 'GameLobbyView').
   ValueKey<String> buildWidgetKey(String prefix) {
     return ValueKey('$prefix-$providerId-$gameCode');
   }
@@ -145,11 +118,11 @@ extension GameTypeUI on GameType {
 // ============================================================================
 
 extension GameCategorySelectionX on GameCategorySelection {
-  /// Converts this selection into a [GameFilter].
+  /// Converts this selection into a [CaxiloFilter].
   /// Returns `null` when the selection is empty (no filter applied).
-  GameFilter? toFilter() {
+  CaxiloFilter? toFilter() {
     if (isEmpty) return null;
 
-    return category!.toFilter();
+    return category!.filter;
   }
 }

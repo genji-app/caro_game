@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_annotation_target
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'provider_games.freezed.dart';
@@ -80,11 +82,7 @@ sealed class Game with _$Game {
     @JsonKey(name: 'lang') required String lang,
     @JsonKey(name: 'lobbyUrl') required String lobbyUrl,
     @JsonKey(name: 'cashierUrl') required String cashierUrl,
-    @JsonKey(
-      name: 'gameType',
-      fromJson: GameType.fromJson,
-      toJson: GameType.toJson,
-    )
+    @JsonKey(name: 'gameType', fromJson: GameType.fromJson, toJson: GameType.toJson)
     required GameType gameType,
     @JsonKey(name: 'mobileLogin') @Default(false) bool mobileLogin,
   }) = _Game;

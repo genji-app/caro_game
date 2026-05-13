@@ -163,6 +163,7 @@ class _MatchHeaderMobileWidgetState extends State<MatchHeaderMobileWidget>
       if (mounted) {
         setState(() {
           _livestreamUrl = response.url;
+          debugPrint('link streaming: ${response.url}');
           _isCheckingLivestream = false;
 
           if (hasLivestreamUrl && _selectedTab == MatchTab.scoreboard) {
@@ -301,8 +302,8 @@ class _MatchHeaderMobileWidgetState extends State<MatchHeaderMobileWidget>
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: ImageHelper.getNetworkImage(
-                      imageUrl: _getStatisticsBackgroundImageUrl(),
+                    child: ImageHelper.load(
+                      path: _getStatisticsBackgroundImageUrl(),
                       fit: BoxFit.fill,
                     ),
                   ),

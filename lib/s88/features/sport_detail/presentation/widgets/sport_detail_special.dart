@@ -326,8 +326,8 @@ class _SpecialOutrightCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(48),
-          child: ImageHelper.getNetworkImage(
-            imageUrl: specialOutright.leagueLogo,
+          child: ImageHelper.load(
+            path: specialOutright.leagueLogo,
             width: 24,
             height: 24,
             fit: BoxFit.contain,

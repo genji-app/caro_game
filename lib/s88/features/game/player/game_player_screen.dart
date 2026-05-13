@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fullscreen_guard/fullscreen_guard.dart';
 import 'package:game_engine/game_engine.dart';
 import 'package:orientation_guard/orientation_guard.dart';
 import 'package:co_caro_flame/s88/core/constants/i18n.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/log_helper.dart';
 import 'package:co_caro_flame/s88/core/utils/web_browser_detect/web_browser_detect.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
+import 'package:co_caro_flame/s88/shared/widgets/orientation/app_orientation_provider.dart';
 import 'package:co_caro_flame/s88/shared/widgets/toast/app_toast.dart';
 
 /// Screen to play games in a WebView.
@@ -30,7 +31,7 @@ class GamePlayerScreen extends ConsumerStatefulWidget {
   const GamePlayerScreen({required this.game, super.key});
 
   const GamePlayerScreen.test({
-    this.game = const GameBlock(
+    this.game = const GameBlock.liveStream(
       providerId: 'amb-vn',
       providerName: 'AMB-VN',
       productId: 'SEXY',
@@ -95,6 +96,12 @@ class _GamePlayerScreenState extends ConsumerState<GamePlayerScreen> {
   late final String _webViewId;
   bool _hasInitialized = false;
 
+  /// Cached reference to the nearest [FullscreenGuardController].
+  /// Stored here because [FullscreenGuard.of] must not be called in [dispose]
+  /// (element is already unmounted at that point).
+  // ignore: unused_field
+  FullscreenGuardController? _fullscreenGuard;
+
   GameBlock get game => widget.game;
 
   @override
@@ -102,19 +109,51 @@ class _GamePlayerScreenState extends ConsumerState<GamePlayerScreen> {
     super.initState();
     _webViewId =
         'game-webview-${game.gameCode.hashCode}-${DateTime.now().millisecondsSinceEpoch}';
+
+    /*
+    if (kIsWeb) {
+      // Request fullscreen via FullscreenGuard gate (user must tap to satisfy browser gesture).
+      // Store controller reference here — calling FullscreenGuard.of in dispose() is unsafe
+      // because the element is already unmounted at that point.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _fullscreenGuard = FullscreenGuard.of(context);
+        _fullscreenGuard!.request(
+          const FullscreenGateRequest(
+            tag: 'gamePlayer',
+            // On iOS Safari, show the swipe-up gate instead of auto-satisfying.
+            // The scroll trick (Minimal UI) is more reliable when triggered
+            // from within the user gesture context (swipe up on the overlay).
+            requiresGestureOnIosSafari: true,
+          ),
+        );
+      });
+    }
+    */
   }
 
   @override
   void dispose() {
+    /*
+    if (kIsWeb) {
+      _fullscreenGuard?.clear();
+    }
+    */
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final canPop = ref.watch(gamePlayerProvider(game).select((s) => s.canPop));
-    final policy = ref
+    // Resolve policy for the current game
+    final OrientationPolicy policy = ref
         .watch(gameBlockOrientationResolverProvider)
         .resolve(context, game);
+
+    // BƯỚC QUAN TRỌNG: Đăng ký policy này với Global Stack thông qua Declarative Provider.
+    // Việc push và pop tự động được Riverpod quản lý theo vòng đời của Widget này.
+    ref.watch(appOrientationLifecycleProvider(policy));
+
+    final canPop = ref.watch(gamePlayerProvider(game).select((s) => s.canPop));
 
     if (kIsWeb) {
       if (!_hasInitialized) {
@@ -140,23 +179,20 @@ class _GamePlayerScreenState extends ConsumerState<GamePlayerScreen> {
 
     return Material(
       color: Colors.transparent,
-      child: OrientationGuard(
-        policy: policy,
-        child: PopScope(
-          canPop: canPop,
-          child: GamePlayerBackground(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: GamePlayerScaffold(
-                    showControls: !game.isInHouseGame,
-                    child: _WebViewLayer(game: game, webViewId: _webViewId),
-                  ),
+      child: PopScope(
+        canPop: canPop,
+        child: GamePlayerBackground(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GamePlayerScaffold(
+                  showControls: !game.isInHouseGame,
+                  child: _WebViewLayer(game: game, webViewId: _webViewId),
                 ),
-                _LoadingOverlay(game: game),
-                _ErrorOverlay(game: game),
-              ],
-            ),
+              ),
+              _LoadingOverlay(game: game),
+              _ErrorOverlay(game: game),
+            ],
           ),
         ),
       ),
@@ -226,62 +262,63 @@ class _WebViewLayerState extends ConsumerState<_WebViewLayer> with LoggerMixin {
 
     Widget webViewContent;
     if (kIsWeb) {
-      if (widget.game.isInHouseGame) {
-        webViewContent = IHRunner(
-          key: ValueKey('cocos-webview-${widget.webViewId}'),
-          gameUrl: gameUrl,
-          onLoadStart: notifier.onLoadStart,
-          onLoadStop: notifier.onLoadStop,
-          onError: notifier.handleError,
-          logger: (level, message, {error, stackTrace}) => _onRunnerLog(
-            'IH',
-            level,
-            message,
-            error: error,
-            stackTrace: stackTrace,
-          ),
-          onHostMessage: (GameHostEvent event) {
-            logDebug('GameHostEvent received: ${event.type}');
-            if (event.isCloseWebView) {
-              Navigator.of(context).maybePop();
-            }
-          },
-          enableHostMessage: widget.game.enableHostMessage,
-          loadStopDebounce: widget.game.loadStopDebounce,
-        );
-      } else {
-        webViewContent = PLRunner(
-          key: ValueKey('webview-${widget.webViewId}'),
-          gameUrl: gameUrl,
-          viewId: widget.webViewId,
-          onLoadStart: notifier.onLoadStart,
-          onLoadStop: notifier.onLoadStop,
-          onError: notifier.handleError,
-          logger: (level, message, {error, stackTrace}) => _onRunnerLog(
-            'PL',
-            level,
-            message,
-            error: error,
-            stackTrace: stackTrace,
-          ),
-          // forceLandscapeViewport should ONLY be applied on tablet devices when
-          // the game's tablet orientation is a landscape variant.
-          //
-          // Rationale:
-          //  - On mobile phones, orientation is handled by the OrientationGuard
-          //    locking the system rotation — no viewport injection needed.
-          //  - On tablets (iPad), iOS does not rotate screen.width/height, so
-          //    games reading those values see portrait dimensions even when fully
-          //    in landscape. The JS polyfill patches this, but ONLY needed on tablet.
-          //  - If the game's tablet orientation is portrait, we must NOT inject
-          //    since the game intentionally shows portrait layout on tablet.
-          //
-          // Detection: shortestSide ≥ 600 = tablet (matches OrientationResolver logic).
-          forceLandscapeViewport: widget.game.shouldForceLandscapeViewport(
-            context,
-          ),
-          loadStopDebounce: widget.game.loadStopDebounce,
-        );
+      switch (widget.game) {
+        case final InHouseGameBlock i:
+          webViewContent = IHRunner(
+            key: ValueKey('cocos-webview-${widget.webViewId}'),
+            gameUrl: gameUrl,
+            onLoadStart: notifier.onLoadStart,
+            onLoadStop: notifier.onLoadStop,
+            onError: notifier.handleError,
+            logger: (level, message, {error, stackTrace}) => _onRunnerLog(
+              'IH',
+              level,
+              message,
+              error: error,
+              stackTrace: stackTrace,
+            ),
+            onHostMessage: (GameHostEvent event) {
+              logDebug('GameHostEvent received: ${event.type}');
+              if (event.isCloseWebView) {
+                Navigator.of(context).maybePop();
+              }
+            },
+            enableHostMessage: i.enableHostMessage,
+            loadStopDebounce: i.loadStopDebounce,
+          );
+        case final LiveStreamGameBlock t:
+          webViewContent = PLRunner(
+            key: ValueKey('webview-${widget.webViewId}'),
+            gameUrl: gameUrl,
+            viewId: widget.webViewId,
+            onLoadStart: notifier.onLoadStart,
+            onLoadStop: notifier.onLoadStop,
+            onError: notifier.handleError,
+            logger: (level, message, {error, stackTrace}) => _onRunnerLog(
+              'PL',
+              level,
+              message,
+              error: error,
+              stackTrace: stackTrace,
+            ),
+            // forceLandscapeViewport should ONLY be applied on tablet devices when
+            // the game's tablet orientation is a landscape variant.
+            //
+            // Rationale:
+            //  - On mobile phones, orientation is handled by the OrientationGuard
+            //    locking the system rotation — no viewport injection needed.
+            //  - On tablets (iPad), iOS does not rotate screen.width/height, so
+            //    games reading those values see portrait dimensions even when fully
+            //    in landscape. The JS polyfill patches this, but ONLY needed on tablet.
+            //  - If the game's tablet orientation is portrait, we must NOT inject
+            //    since the game intentionally shows portrait layout on tablet.
+            //
+            // Detection: shortestSide ≥ 600 = tablet (matches OrientationResolver logic).
+            forceLandscapeViewport: widget.game.shouldForceLandscapeViewport(
+              context,
+            ),
+            loadStopDebounce: t.loadStopDebounce,
+          );
       }
     } else {
       webViewContent = _AnimatedWebView(
@@ -350,65 +387,71 @@ class _AnimatedWebViewState extends ConsumerState<_AnimatedWebView>
     );
     final notifier = ref.read(gamePlayerProvider(widget.game).notifier);
 
+    Widget webViewContent;
+    switch (widget.game) {
+      case final InHouseGameBlock i:
+        webViewContent = IHRunner(
+          key: ValueKey('cocos-webview-${widget.webViewId}'),
+          gameUrl: widget.gameUrl,
+          onLoadStart: notifier.onLoadStart,
+          onLoadStop: notifier.onLoadStop,
+          onError: notifier.handleError,
+          logger: (level, message, {error, stackTrace}) => _onRunnerLog(
+            'IH',
+            level,
+            message,
+            error: error,
+            stackTrace: stackTrace,
+          ),
+          onHostMessage: (GameHostEvent event) {
+            logDebug('GameHostEvent received: ${event.type}');
+            if (event.isCloseWebView) {
+              Navigator.of(context).maybePop();
+            }
+          },
+          enableHostMessage: i.enableHostMessage,
+          loadStopDebounce: i.loadStopDebounce,
+        );
+      case final LiveStreamGameBlock t:
+        webViewContent = PLRunner(
+          key: ValueKey('webview-${widget.webViewId}'),
+          gameUrl: widget.gameUrl,
+          viewId: widget.webViewId,
+          onLoadStart: notifier.onLoadStart,
+          onLoadStop: notifier.onLoadStop,
+          onError: notifier.handleError,
+          logger: (level, message, {error, stackTrace}) => _onRunnerLog(
+            'PL',
+            level,
+            message,
+            error: error,
+            stackTrace: stackTrace,
+          ),
+          // forceLandscapeViewport should ONLY be applied on tablet devices when
+          // the game's tablet orientation is a landscape variant.
+          //
+          // Rationale:
+          //  - On mobile phones, orientation is handled by the OrientationGuard
+          //    locking the system rotation — no viewport injection needed.
+          //  - On tablets (iPad), iOS does not rotate screen.width/height, so
+          //    games reading those values see portrait dimensions even when fully
+          //    in landscape. The JS polyfill patches this, but ONLY needed on tablet.
+          //  - If the game's tablet orientation is portrait, we must NOT inject
+          //    since the game intentionally shows portrait layout on tablet.
+          //
+          // Detection: shortestSide ≥ 600 = tablet (matches OrientationResolver logic).
+          forceLandscapeViewport: widget.game.shouldForceLandscapeViewport(
+            context,
+          ),
+          loadStopDebounce: t.loadStopDebounce,
+        );
+    }
+
     return AnimatedOpacity(
       opacity: showWebView ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 777),
       curve: Curves.slowMiddle,
-      child: widget.game.isInHouseGame
-          ? IHRunner(
-              key: ValueKey('cocos-webview-${widget.webViewId}'),
-              gameUrl: widget.gameUrl,
-              onLoadStart: notifier.onLoadStart,
-              onLoadStop: notifier.onLoadStop,
-              onError: notifier.handleError,
-              logger: (level, message, {error, stackTrace}) => _onRunnerLog(
-                'IH',
-                level,
-                message,
-                error: error,
-                stackTrace: stackTrace,
-              ),
-              onHostMessage: (GameHostEvent event) {
-                logDebug('GameHostEvent received: ${event.type}');
-                if (event.isCloseWebView) {
-                  Navigator.of(context).maybePop();
-                }
-              },
-              enableHostMessage: widget.game.enableHostMessage,
-              loadStopDebounce: widget.game.loadStopDebounce,
-            )
-          : PLRunner(
-              key: ValueKey('webview-${widget.webViewId}'),
-              gameUrl: widget.gameUrl,
-              viewId: widget.webViewId,
-              onLoadStart: notifier.onLoadStart,
-              onLoadStop: notifier.onLoadStop,
-              onError: notifier.handleError,
-              logger: (level, message, {error, stackTrace}) => _onRunnerLog(
-                'PL',
-                level,
-                message,
-                error: error,
-                stackTrace: stackTrace,
-              ),
-              // forceLandscapeViewport should ONLY be applied on tablet devices when
-              // the game's tablet orientation is a landscape variant.
-              //
-              // Rationale:
-              //  - On mobile phones, orientation is handled by the OrientationGuard
-              //    locking the system rotation — no viewport injection needed.
-              //  - On tablets (iPad), iOS does not rotate screen.width/height, so
-              //    games reading those values see portrait dimensions even when fully
-              //    in landscape. The JS polyfill patches this, but ONLY needed on tablet.
-              //  - If the game's tablet orientation is portrait, we must NOT inject
-              //    since the game intentionally shows portrait layout on tablet.
-              //
-              // Detection: shortestSide ≥ 600 = tablet (matches OrientationResolver logic).
-              forceLandscapeViewport: widget.game.shouldForceLandscapeViewport(
-                context,
-              ),
-              loadStopDebounce: widget.game.loadStopDebounce,
-            ),
+      child: webViewContent,
     );
   }
 
@@ -472,9 +515,10 @@ class _LoadingOverlay extends ConsumerWidget {
 // Layer 3: Error overlay
 // ---------------------------------------------------------------------------
 
-/// Full-screen error overlay with a retry action.
+/// Full-screen error overlay.
 ///
-/// Rebuilds only when [GamePlayerState.errorMessage] changes.
+/// Rebuilds when [GamePlayerState.status], [GamePlayerState.errorType],
+/// or [GamePlayerState.errorMessage] change.
 class _ErrorOverlay extends ConsumerWidget {
   const _ErrorOverlay({required this.game});
 
@@ -483,10 +527,8 @@ class _ErrorOverlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gamePlayerProvider(game));
-    final status = state.status;
-    final errorMessage = state.errorMessage;
 
-    if (status == GamePlayerStatus.maintenance) {
+    if (state.status == GamePlayerStatus.maintenance) {
       return Positioned.fill(
         child: Center(
           child: GamePlayerMaintenance(
@@ -496,19 +538,53 @@ class _ErrorOverlay extends ConsumerWidget {
       );
     }
 
-    if (errorMessage == null) return const SizedBox.shrink();
+    if (state.status != GamePlayerStatus.failure) {
+      return const SizedBox.shrink();
+    }
 
-    return Positioned.fill(
-      child: Center(
-        child: GamePlayerFailure(
-          // ignore: dead_code, dead_null_aware_expression
-          message: Text(errorMessage ?? I18n.msgSomethingWentWrong),
-          // secondaryMessage: Text('Xin vui long thu lai'),
-          onRetry: () {
-            ref.read(gamePlayerProvider(game).notifier).retry();
-          },
-        ),
+    final errorType = state.errorType;
+    final errorMessage = state.errorMessage;
+    final notifier = ref.read(gamePlayerProvider(game).notifier);
+    void goBack() => Navigator.of(context).maybePop();
+    void retry() => notifier.retry();
+
+    final Widget child = switch (errorType) {
+      GamePlayerErrorType.network => GamePlayerFailure(
+        message: const Text('Không có kết nối mạng'),
+        secondaryMessage: const Text('Kiểm tra kết nối và thử lại'),
+        onRetry: state.isRetryable ? retry : null,
+        onGoBack: goBack,
       ),
-    );
+      GamePlayerErrorType.sessionExpired => GamePlayerFailure(
+        message: const Text('Phiên đăng nhập hết hạn'),
+        secondaryMessage: const Text('Vui lòng đăng nhập lại để tiếp tục'),
+        onGoBack: goBack,
+      ),
+      GamePlayerErrorType.comingSoon => GamePlayerFailure(
+        message: const Text('Game sắp ra mắt'),
+        secondaryMessage: const Text('Nội dung này chưa được phát hành'),
+        onGoBack: goBack,
+      ),
+      GamePlayerErrorType.unavailable => GamePlayerFailure(
+        message: const Text('Game không khả dụng'),
+        secondaryMessage: const Text(
+          'Game này hiện đang tạm dừng hoặc đang phát triển',
+        ),
+        onGoBack: goBack,
+      ),
+      GamePlayerErrorType.serverError => GamePlayerFailure(
+        message: const Text('Lỗi máy chủ'),
+        secondaryMessage: const Text('Máy chủ gặp sự cố, vui lòng thử lại'),
+        onRetry: state.isRetryable ? retry : null,
+        onGoBack: goBack,
+      ),
+      GamePlayerErrorType.unknown || null => GamePlayerFailure(
+        message: Text(errorMessage ?? I18n.msgSomethingWentWrong),
+        onRetry: state.isRetryable ? retry : null,
+        onGoBack: goBack,
+      ),
+    };
+
+    return Positioned.fill(child: Center(child: child));
   }
 }

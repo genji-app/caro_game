@@ -27,42 +27,7 @@ class _GiftCodeOverlayState extends ConsumerState<GiftCodeOverlay> {
             child: Container(color: Colors.black.withValues(alpha: 0.5)),
           ),
         ),
-        // Centered dialog
-        Center(
-          child: Material(
-            color: Colors.transparent,
-            elevation: 24,
-            child: InnerShadowCard(
-              child: Container(
-                width: 640,
-                height: 823,
-                constraints: BoxConstraints(maxHeight: size.height * 0.9),
-                decoration: BoxDecoration(
-                  color: AppColors.gray950,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.75),
-                      offset: const Offset(-20, 4),
-                      blurRadius: 200,
-                    ),
-                    BoxShadow(
-                      offset: const Offset(0, 0.5),
-                      blurRadius: 0.5,
-                      spreadRadius: 0,
-                      blurStyle: BlurStyle.inner,
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: const GiftCodeContainer(),
-                ),
-              ),
-            ),
-          ),
-        ),
+        const GiftCodeContainer(),
       ],
     );
   }

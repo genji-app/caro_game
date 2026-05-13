@@ -20,32 +20,48 @@ const migratedHeaderContentTypes = {
   MainContentType.leagueDetail,
 };
 
-/// Computes the back action for the overlay header based on current content type.
+/// Computes the back action for the overlay header based on current content
+/// type.
+///
+/// **Riverpod pitfall** — the returned callbacks mutate providers that this
+/// provider `watch`es (mainContentProvider, previousContentProvider). Once a
+/// watched dependency changes, calling `ref.*` again before the provider
+/// rebuilds trips Riverpod's `_didChangeDependency` assertion and crashes.
+///
+/// Every branch below therefore:
+///   1. Resolves every required notifier/value via `ref.*` up front, while
+///      the provider is still rebuilding (safe zone).
+///   2. Returns a closure that only uses the cached locals — no `ref.*`
+///      calls happen after the first state mutation.
 final _headerBackActionProvider = Provider<VoidCallback?>((ref) {
   final contentType = ref.watch(mainContentProvider);
 
   switch (contentType) {
     case MainContentType.sportDetail:
+      final previous = ref.read(previousContentProvider);
+      final mainNotifier = ref.read(mainContentProvider.notifier);
       return () {
-        final previous = ref.read(previousContentProvider);
         if (previous == MainContentType.home) {
-          ref.read(mainContentProvider.notifier).goToHome();
+          mainNotifier.goToHome();
         } else {
-          ref.read(mainContentProvider.notifier).goToSport();
+          mainNotifier.goToSport();
         }
-        // ref.read(previousContentProvider.notifier).state = null;
       };
     case MainContentType.betDetail:
+      final betDetailNotifier = ref.read(betDetailMobileV2Provider.notifier);
+      final mainNotifier = ref.read(mainContentProvider.notifier);
       return () {
-        ref.read(betDetailMobileV2Provider.notifier).clear();
-        ref.read(mainContentProvider.notifier).goBackFromBetDetail();
+        betDetailNotifier.clear();
+        mainNotifier.goBackFromBetDetail();
       };
     case MainContentType.leagueDetail:
       final previous = ref.watch(previousContentProvider);
       if (previous == null) return null;
+      final mainNotifier = ref.read(mainContentProvider.notifier);
+      final previousNotifier = ref.read(previousContentProvider.notifier);
       return () {
-        ref.read(mainContentProvider.notifier).switchTo(previous);
-        ref.read(previousContentProvider.notifier).state = null;
+        previousNotifier.state = null;
+        mainNotifier.switchTo(previous);
       };
     default:
       return null;
@@ -54,13 +70,17 @@ final _headerBackActionProvider = Provider<VoidCallback?>((ref) {
 
 /// Header that slides up/down based on scroll progress.
 ///
-/// Height changes dynamically: 68px (fully visible) → 6px (mostly hidden).
-/// Sits in a Column above the content area, so pinned SliverPersistentHeaders
-/// in the content always pin just below the header's visible bottom edge.
+/// **Layout strategy (Option A):**
+/// The outer [SizedBox] height is **fixed** at [ScrollHideNotifier.headerHeight].
+/// Hiding is done via [Transform.translate] — which only triggers a repaint,
+/// not a relayout. This avoids the layout thrash that would occur if the
+/// parent had to rebalance its children every frame.
 ///
-/// Uses OverflowBox + ClipRect: the header content is always 68px tall,
-/// but the outer container shrinks. ClipRect clips the overflow, showing
-/// only the bottom portion of the header (slide-up effect).
+/// Usage: sit this widget inside a [Stack] as a `Positioned(top: 0, ...)`
+/// overlay. The shell content underneath receives a matching animated top
+/// padding (see `_ShellContentWithHeaderSpacer` in `main_shell_layout.dart`)
+/// so the content grows/shrinks in lock-step with the header — no gap is ever
+/// left between the residual header and the content.
 class AnimatedShellHeader extends ConsumerWidget {
   const AnimatedShellHeader({super.key});
 
@@ -68,7 +88,7 @@ class AnimatedShellHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final contentType = ref.watch(mainContentProvider);
 
-    // Non-migrated pages: no header, 0px in Column
+    // Non-migrated pages: no header
     if (!migratedHeaderContentTypes.contains(contentType)) {
       return const SizedBox.shrink();
     }
@@ -76,57 +96,52 @@ class AnimatedShellHeader extends ConsumerWidget {
     final scrollHide = ref.watch(scrollHideProvider);
 
     return RepaintBoundary(
-      child: ValueListenableBuilder<double>(
-        valueListenable: scrollHide.progress,
-        builder: (context, progress, child) {
-          // Visible height shrinks from 68 → 6 as progress goes 0 → 1
-          final visibleHeight =
-              ScrollHideNotifier.headerHeight -
-              progress * ScrollHideNotifier.maxOffset;
-          return SizedBox(
-            height: visibleHeight,
-            child: ClipRect(
-              child: OverflowBox(
-                minHeight: ScrollHideNotifier.headerHeight,
-                maxHeight: ScrollHideNotifier.headerHeight,
-                alignment: Alignment.bottomCenter,
-                child: child,
-              ),
+      child: SizedBox(
+        // Fixed height — Transform.translate below handles the slide, so the
+        // parent never sees the size change during scroll.
+        height: ScrollHideNotifier.headerHeight,
+        child: ClipRect(
+          child: ValueListenableBuilder<double>(
+            valueListenable: scrollHide.progress,
+            builder: (context, progress, child) => Transform.translate(
+              // progress 0 → offset 0 (fully visible)
+              // progress 1 → offset -maxOffset (only minVisibleHeight left)
+              offset: Offset(0, -progress * ScrollHideNotifier.maxOffset),
+              child: child,
             ),
-          );
-        },
-        child: SizedBox(
-          height: ScrollHideNotifier.headerHeight,
-          child: Consumer(
-            builder: (context, ref, _) {
-              final content = ref.watch(mainContentProvider);
-              switch (content) {
-                case MainContentType.home:
-                case MainContentType.casino:
-                case MainContentType.tournaments:
-                case MainContentType.live:
-                case MainContentType.upcoming:
-                  return ResponsiveBuilder.isMobile(context)
-                      ? const ShellMobileHeader()
-                      : const ShellTabletHeader();
-                case MainContentType.leagueDetail:
-                  final onBackPressed = ref.watch(_headerBackActionProvider);
-                  if (onBackPressed != null) {
+            child: Consumer(
+              builder: (context, ref, _) {
+                final content = ref.watch(mainContentProvider);
+                switch (content) {
+                  case MainContentType.home:
+                  case MainContentType.casino:
+                  case MainContentType.tournaments:
+                  case MainContentType.live:
+                  case MainContentType.upcoming:
+                    return ResponsiveBuilder.isMobile(context)
+                        ? const ShellMobileHeader()
+                        : const ShellTabletHeader();
+                  case MainContentType.leagueDetail:
+                    final onBackPressed = ref.watch(_headerBackActionProvider);
+                    if (onBackPressed != null) {
+                      return SportDetailMobileHeader(
+                        onBackPressed: onBackPressed,
+                      );
+                    }
+                    return ResponsiveBuilder.isMobile(context)
+                        ? const ShellMobileHeader()
+                        : const ShellTabletHeader();
+                  case MainContentType.sportDetail:
+                  case MainContentType.betDetail:
+                    final onBackPressed = ref.watch(_headerBackActionProvider);
                     return SportDetailMobileHeader(
                       onBackPressed: onBackPressed,
                     );
-                  }
-                  return ResponsiveBuilder.isMobile(context)
-                      ? const ShellMobileHeader()
-                      : const ShellTabletHeader();
-                case MainContentType.sportDetail:
-                case MainContentType.betDetail:
-                  final onBackPressed = ref.watch(_headerBackActionProvider);
-                  return SportDetailMobileHeader(onBackPressed: onBackPressed);
-                default:
-                  return const SizedBox.shrink();
-              }
-            },
+                  default:
+                    return const SizedBox.shrink();
+                }
+              },
+            ),
           ),
         ),
       ),

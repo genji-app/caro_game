@@ -20,7 +20,12 @@ class GiftcodeSubmitNotifier extends StateNotifier<GiftcodeSubmitState> {
 
     result.fold(
       (failure) => state = GiftcodeSubmitState.error(failure.message),
-      (response) => state = const GiftcodeSubmitState.success(),
+      (response) {
+        // Success message returned by paygate is stashed in additionalData
+        final successMessage =
+            response.additionalData?['success_message']?.toString();
+        state = GiftcodeSubmitState.success(message: successMessage);
+      },
     );
   }
 

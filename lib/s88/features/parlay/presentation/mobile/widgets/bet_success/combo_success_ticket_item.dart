@@ -47,14 +47,25 @@ class ComboSuccessTicketItem extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     child: Row(
       children: [
-        const Icon(Icons.check_circle, size: 20, color: AppColors.green400),
+        const Icon(Icons.check, size: 20, color: AppColors.green400),
         const Gap(8),
         Expanded(
-          child: Text(
-            'x${selections.length} Chân',
-            style: AppTextStyles.labelSmall(
-              color: AppColorStyles.contentSecondary,
-            ),
+          child: Row(
+            children: [
+              ImageHelper.load(
+                path: AppIcons.iconParlay,
+                width: 20,
+                height: 20,
+                color: AppColorStyles.contentSecondary,
+              ),
+              const Gap(4),
+              Text(
+                'Xiên ${selections.length} chân',
+                style: AppTextStyles.labelSmall(
+                  color: AppColorStyles.contentSecondary,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -66,7 +77,7 @@ class ComboSuccessTicketItem extends StatelessWidget {
     width: double.infinity,
     decoration: const BoxDecoration(
       color: AppColorStyles.backgroundQuaternary,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      // borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
     ),
     padding: const EdgeInsets.all(12),
     child: Column(
@@ -93,16 +104,20 @@ class ComboSuccessTicketItem extends StatelessWidget {
         // Tổng cược và Tổng thắng (cùng 1 hàng)
         Row(
           children: [
-            _buildTotalColumn(
-              label: 'Tổng cược',
-              value: stake.toDouble(),
-              alignment: CrossAxisAlignment.start,
+            Expanded(
+              child: _buildTotalColumn(
+                label: 'Tổng cược',
+                value: stake.toDouble(),
+                alignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.start,
+              ),
             ),
             Expanded(
               child: _buildTotalColumn(
                 label: 'Thanh toán dự kiến',
                 value: potentialWin,
                 alignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.end,
               ),
             ),
           ],
@@ -115,6 +130,7 @@ class ComboSuccessTicketItem extends StatelessWidget {
     required String label,
     required double value,
     required CrossAxisAlignment alignment,
+    required MainAxisAlignment mainAxisAlignment,
   }) => Column(
     crossAxisAlignment: alignment,
     children: [
@@ -123,15 +139,20 @@ class ComboSuccessTicketItem extends StatelessWidget {
         style: AppTextStyles.labelSmall(color: AppColorStyles.contentSecondary),
       ),
       const Gap(4),
-      RichText(
-        text: TextSpan(
-          style: AppTextStyles.labelMedium(
-            color: AppColorStyles.contentSecondary,
+      Row(
+        mainAxisAlignment: mainAxisAlignment,
+        children: [
+          RichText(
+            text: TextSpan(
+              style: AppTextStyles.labelMedium(
+                color: AppColorStyles.contentSecondary,
+              ),
+              children: [TextSpan(text: _formatCurrency(value))],
+            ),
           ),
-          children: [TextSpan(text: _formatCurrency(value))],
-        ),
+          const SCoinIcon(),
+        ],
       ),
-      const SCoinIcon(),
     ],
   );
 
@@ -176,12 +197,19 @@ class _ComboLegTileSuccess extends StatelessWidget {
               // Match name
               Row(
                 children: [
-                  if (bet.isLive) ...[_SuccessDot(), const Gap(8)],
+                  if (bet.isLive) ...[
+                    ImageHelper.load(
+                      path: AppIcons.iconSoccer,
+                      width: 18,
+                      height: 18,
+                    ),
+                    const Gap(8),
+                  ],
                   Expanded(
                     child: Text(
-                      '${bet.eventData.homeName} vs ${bet.eventData.awayName}',
-                      style: AppTextStyles.labelSmall(
-                        color: AppColorStyles.contentSecondary,
+                      '${bet.eventData.homeName} - ${bet.eventData.awayName}',
+                      style: AppTextStyles.paragraphSmall(
+                        color: AppColorStyles.contentTertiary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -195,7 +223,7 @@ class _ComboLegTileSuccess extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: AppColorStyles.backgroundTertiary,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,8 +234,8 @@ class _ComboLegTileSuccess extends StatelessWidget {
                         children: [
                           Text(
                             bet.marketName,
-                            style: AppTextStyles.paragraphMedium(
-                              color: AppColorStyles.contentSecondary,
+                            style: AppTextStyles.labelSmall(
+                              color: AppColorStyles.contentTertiary,
                             ),
                           ),
                           const Gap(4),
@@ -233,7 +261,7 @@ class _ComboLegTileSuccess extends StatelessWidget {
                         Text(
                           bet.displayOddsString,
                           style: AppTextStyles.labelMedium(
-                            color: const Color(0xFFFDE272),
+                            color: AppColors.green300,
                           ),
                         ),
                       ],

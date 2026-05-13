@@ -1,511 +1,137 @@
 import 'package:co_caro_flame/s88/core/utils/extensions/assets_data.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_icons.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_images.dart';
+import 'package:co_caro_flame/s88/core/utils/styles/app_rive.dart';
 
-/// AssetsData definitions cho AppIcons và AppImages
+/// Auto-register asset versioning cho TOÀN BỘ static URLs trong app
+/// (icons / images / rive). Mỗi URL được auto-register với version mặc định = 1.
 ///
-/// File này chứa versioning information cho các icons/images cần cache với versioning.
-/// Khi update icon/image, chỉ cần thay đổi `oldVersion` và `newVersion` ở đây.
+/// ─────────────────────────────────────────────────────────────────
+/// QUY TẮC SỬ DỤNG
+/// ─────────────────────────────────────────────────────────────────
 ///
-/// Usage:
-/// 1. Thêm AssetsData cho icon/image cần versioning
-/// 2. Register trong app.dart: AssetsCacheManager.registerAssets(AppAssetsData.allIcons)
-/// 3. ImageHelper.load() sẽ tự động dùng versioning
+/// 1. **Thêm icon/image MỚI** → chỉ cần thêm URL vào AppIcons / AppImages /
+///    AppRive như bình thường. Auto-registration tự pickup. KHÔNG cần đụng
+///    file này.
+///
+/// 2. **Server đổi NỘI DUNG ở cùng URL** (vd hot-fix icon, đổi logo team) →
+///    thêm 1 dòng vào [_versionOverrides]:
+///
+///    ```dart
+///    AppIcons.iconBasketballSelected: 2,   // bump 1 → 2
+///    AppImages.logoChampion: 3,            // bump 2 → 3 lần thứ 2
+///    ```
+///
+///    `oldVersion` được auto-derive = `newVersion - 1`. Khi user mở app,
+///    `AssetsCacheManager.registerAssets` sẽ tự clear cache cũ cho key đó.
+///
+/// 3. **QUY TẮC BUMP**: tăng tuần tự (1→2→3→…), KHÔNG skip. Skip vẫn chạy
+///    được nhưng để lại file rác `_v1`/`_v2` trong disk cache cho đến khi
+///    flutter_cache_manager tự dọn (stalePeriod 14 ngày hoặc LRU evict).
+///
+/// 4. **URL ĐỘNG** (team logo từ API, avatar user, banner CMS, …) KHÔNG đăng
+///    ký ở đây — bản chất không biết URL trước build-time. Chúng vẫn được
+///    cache (key = URL gốc, không versioned). Để force update, gọi
+///    `AssetsCacheManager.clearCacheForUrl(url)` khi nhận signal đổi.
+///
+/// ─────────────────────────────────────────────────────────────────
+/// CALLED BY
+/// ─────────────────────────────────────────────────────────────────
+/// `app.dart` → `AssetsCacheManager.registerAssets(AppAssetsData.all)`
+/// chạy 1 lần ở app startup.
 class AppAssetsData {
   AppAssetsData._();
 
-  // ===== ICONS =====
+  // ============================================================
+  // BUMP VERSION KHI CẦN UPDATE ICON / IMAGE
+  // ============================================================
 
-  /// Icon: Icon_Basketball_selected.svg
-  static AssetsData get iconBasketballSelected => AssetsData(
-    label: 'icon_basketball_selected',
-    urlPath: AppIcons.iconBasketballSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  /// Map URL → newVersion. Default version = 1 nếu URL không có ở đây.
+  ///
+  /// CHỈ thay đổi map này khi cần update server-side asset (cùng URL nhưng
+  /// nội dung mới). Mọi URL không có ở đây = version 1.
+  ///
+  /// Example:
+  /// ```dart
+  /// static final Map<String, int> _versionOverrides = <String, int>{
+  ///   AppIcons.iconBasketballSelected: 2,
+  ///   AppImages.logoChampion: 3,
+  ///   AppRive.someAnimation: 2,
+  /// };
+  /// ```
+  static final Map<String, int> _versionOverrides = <String, int>{
+    // Thêm entries ở đây khi cần bump version cụ thể.
+  };
 
-  /// Icon: Icon_Football_selected.svg
-  static AssetsData get iconFootballSelected => AssetsData(
-    label: 'icon_football_selected',
-    urlPath: AppIcons.iconFootballSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  // ============================================================
+  // PUBLIC API — caller dùng `all` để register
+  // ============================================================
 
-  /// Icon: Icon_Tennis_selected.svg
-  static AssetsData get iconTennisSelected => AssetsData(
-    label: 'icon_tennis_selected',
-    urlPath: AppIcons.iconTennisSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  /// Tất cả assets (icons + images + rive) đã được auto-register.
+  /// Dùng ở `app.dart`: `AssetsCacheManager.registerAssets(AppAssetsData.all)`.
+  static List<AssetsData> get all =>
+      _allUrls.map(_buildAsset).toList(growable: false);
 
-  /// Icon: Icon_Volleyball_selected.svg
-  static AssetsData get iconVolleyballSelected => AssetsData(
-    label: 'icon_volleyball_selected',
-    urlPath: AppIcons.iconVolleyballSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  /// Subset: chỉ icons (cho callers cần group riêng).
+  static List<AssetsData> get allIcons =>
+      _iconUrls.map(_buildAsset).toList(growable: false);
 
-  /// Icon: Icon_table_tennis_selected.svg
-  static AssetsData get iconTableTennisSelected => AssetsData(
-    label: 'icon_table_tennis_selected',
-    urlPath: AppIcons.iconTableTennisSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  /// Subset: chỉ images.
+  static List<AssetsData> get allImages =>
+      _imageUrls.map(_buildAsset).toList(growable: false);
 
-  /// Icon: Icon_Bet_1_selected.svg
-  static AssetsData get iconBet1Selected => AssetsData(
-    label: 'icon_bet_1_selected',
-    urlPath: AppIcons.iconBet1Selected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  /// Subset: chỉ rive animations.
+  static List<AssetsData> get allRive =>
+      _riveUrls.map(_buildAsset).toList(growable: false);
 
-  /// Icon: Icon_Chat_selected.svg
-  static AssetsData get iconChatSelected => AssetsData(
-    label: 'icon_chat_selected',
-    urlPath: AppIcons.iconChatSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  // ============================================================
+  // INTERNAL HELPERS
+  // ============================================================
 
-  /// Icon: Icon_Setting_selected.svg
-  static AssetsData get iconSettingSelected => AssetsData(
-    label: 'icon_setting_selected',
-    urlPath: AppIcons.iconSettingSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  /// Tất cả URLs static, dedup qua Set (giữ insertion order).
+  static Set<String> get _allUrls => <String>{
+    ..._iconUrls,
+    ..._imageUrls,
+    ..._riveUrls,
+  };
 
-  /// Icon: Icon_Support_selected.svg
-  static AssetsData get iconSupportSelected => AssetsData(
-    label: 'icon_support_selected',
-    urlPath: AppIcons.iconSupportSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  static Set<String> get _iconUrls => <String>{
+    ...AppIcons.remoteUrlsForPreload,
+    ...AppIcons.remoteUrlsForPreloadGameOnly,
+  };
 
-  /// Icon: Icon_Trophy_selected.svg
-  static AssetsData get iconTrophySelected => AssetsData(
-    label: 'icon_trophy_selected',
-    urlPath: AppIcons.iconTrophySelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  static Set<String> get _imageUrls => <String>{
+    ...AppImages.remoteUrlsForPreload,
+  };
 
-  /// Icon: Icon_event_selected.svg
-  static AssetsData get iconEventSelected => AssetsData(
-    label: 'icon_event_selected',
-    urlPath: AppIcons.iconEventSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  static Set<String> get _riveUrls => <String>{
+    ...AppRive.remoteUrlsForPreload,
+  };
 
-  /// Icon: Icon_chart_selected.svg
-  static AssetsData get iconChartSelected => AssetsData(
-    label: 'icon_chart_selected',
-    urlPath: AppIcons.iconChartSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
+  /// Build AssetsData cho 1 URL: auto-derive label, version từ override map.
+  static AssetsData _buildAsset(String url) {
+    final newV = _versionOverrides[url] ?? 1;
+    final oldV = newV > 1 ? newV - 1 : 1;
+    return AssetsData(
+      label: _labelOf(url),
+      urlPath: url,
+      oldVersion: oldV,
+      newVersion: newV,
+    );
+  }
 
-  /// Icon: icon_basketball.svg
-  static AssetsData get iconBasketball => AssetsData(
-    label: 'icon_basketball',
-    urlPath: AppIcons.iconBasketball,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_soccer.svg
-  static AssetsData get iconSoccer => AssetsData(
-    label: 'icon_soccer',
-    urlPath: AppIcons.iconSoccer,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: soccer.svg
-  static AssetsData get soccer => AssetsData(
-    label: 'soccer',
-    urlPath: AppIcons.soccer,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: tennis.svg
-  static AssetsData get tennis => AssetsData(
-    label: 'tennis',
-    urlPath: AppIcons.tennis,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: volleyball.svg
-  static AssetsData get volleyball => AssetsData(
-    label: 'volleyball',
-    urlPath: AppIcons.volleyball,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_volleyball.svg
-  static AssetsData get iconVolleyball => AssetsData(
-    label: 'icon_volleyball',
-    urlPath: AppIcons.iconVolleyball,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_bar_chart.svg
-  static AssetsData get iconBarChart => AssetsData(
-    label: 'icon_bar_chart',
-    urlPath: AppIcons.iconBarChart,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_chart.svg
-  static AssetsData get iconChart => AssetsData(
-    label: 'icon_chart',
-    urlPath: AppIcons.iconChart,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_parlay.svg
-  static AssetsData get iconParlay => AssetsData(
-    label: 'icon_parlay',
-    urlPath: AppIcons.iconParlay,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: chevron_up.svg
-  static AssetsData get chevronUp => AssetsData(
-    label: 'chevron_up',
-    urlPath: AppIcons.chevronUp,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: sport_status_selected.svg
-  static AssetsData get sportStatusSelected => AssetsData(
-    label: 'sport_status_selected',
-    urlPath: AppIcons.sportStatusSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_s.svg
-  static AssetsData get iconS => AssetsData(
-    label: 'icon_s',
-    urlPath: AppIcons.iconS,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: Icon_Menu_selected.svg
-  static AssetsData get iconMenuSelected => AssetsData(
-    label: 'icon_menu_selected',
-    urlPath: AppIcons.iconMenuSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_soccer_selected.svg
-  static AssetsData get iconSoccerSelected => AssetsData(
-    label: 'icon_soccer_selected',
-    urlPath: AppIcons.iconSoccerSelected,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_home_sport.svg
-  static AssetsData get iconHomeSport => AssetsData(
-    label: 'icon_home_sport',
-    urlPath: AppIcons.iconHomeSport,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_coming_sport.svg
-  static AssetsData get iconComingSport => AssetsData(
-    label: 'icon_coming_sport',
-    urlPath: AppIcons.iconComingSport,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Icon: icon_favorite_sport.svg
-  static AssetsData get iconFavoriteSport => AssetsData(
-    label: 'icon_favorite_sport',
-    urlPath: AppIcons.iconFavoriteSport,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  // ===== IMAGES =====
-
-  /// Image: live.webp
-  static AssetsData get live => AssetsData(
-    label: 'live',
-    urlPath: AppImages.live,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: header_shadow.webp
-  static AssetsData get headerShadow => AssetsData(
-    label: 'header_shadow',
-    urlPath: AppImages.headerShadow,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: avatar.webp
-  static AssetsData get avatar => AssetsData(
-    label: 'avatar',
-    urlPath: AppImages.avatar,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: btn_refill.png
-  static AssetsData get btnRefill => AssetsData(
-    label: 'btn_refill',
-    urlPath: AppImages.btnRefill,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: person_soccer.webp
-  static AssetsData get personSoccer => AssetsData(
-    label: 'person_soccer',
-    urlPath: AppImages.personSoccer,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: person_tennis.webp
-  static AssetsData get personTennis => AssetsData(
-    label: 'person_tennis',
-    urlPath: AppImages.personTennis,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: person_volleyball.webp
-  static AssetsData get personVolleyball => AssetsData(
-    label: 'person_volleyball',
-    urlPath: AppImages.personVolleyball,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: person_table_tennis.webp
-  // static AssetsData get personTableTennis => AssetsData(
-  //   label: 'person_table_tennis',
-  //   urlPath: AppImages.personTableTennis,
-  //   oldVersion: 1,
-  //   newVersion: 1,
-  // );
-
-  // /// Image: person_horse_racing.webp
-  // static AssetsData get personHorseRacing => AssetsData(
-  //   label: 'person_horse_racing',
-  //   urlPath: AppImages.personHorseRacing,
-  //   oldVersion: 1,
-  //   newVersion: 1,
-  // );
-
-  /// Image: logo_bundesliga.png
-  static AssetsData get logoBundesliga => AssetsData(
-    label: 'logo_bundesliga',
-    urlPath: AppImages.logoBundesliga,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: logo_champion.png
-  static AssetsData get logoChampion => AssetsData(
-    label: 'logo_champion',
-    urlPath: AppImages.logoChampion,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: logo_laliga.png
-  static AssetsData get logoLaliga => AssetsData(
-    label: 'logo_laliga',
-    urlPath: AppImages.logoLaliga,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: logo_league1.png
-  static AssetsData get logoLeague1 => AssetsData(
-    label: 'logo_league1',
-    urlPath: AppImages.logoLeague1,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: logo_premileague.png
-  static AssetsData get logoPremileague => AssetsData(
-    label: 'logo_premileague',
-    urlPath: AppImages.logoPremileague,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: logo_seriA.png
-  static AssetsData get logoSeriA => AssetsData(
-    label: 'logo_seriA',
-    urlPath: AppImages.logoSeriA,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: logo_sun88.svg
-  static AssetsData get logoSun88 => AssetsData(
-    label: 'logo_sun88',
-    urlPath: AppImages.logoSun88,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: logo_s88_home.webp
-  static AssetsData get logoS88Home => AssetsData(
-    label: 'logo_s88_home',
-    urlPath: AppImages.logoS88Home,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: background_balance.png
-  static AssetsData get backgroundBalance => AssetsData(
-    label: 'background_balance',
-    urlPath: AppImages.backgroundBalance,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: background_bet_dialog.webp
-  static AssetsData get backgroundBetDialog => AssetsData(
-    label: 'background_bet_dialog',
-    urlPath: AppImages.backgroundBetDialog,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: background_hot.webp
-  static AssetsData get backgroundHot => AssetsData(
-    label: 'background_hot',
-    urlPath: AppImages.backgroundHot,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: background_hot_tablet.webp
-  static AssetsData get backgroundHotTablet => AssetsData(
-    label: 'background_hot_tablet',
-    urlPath: AppImages.backgroundHotTablet,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: image_soccer.webp
-  static AssetsData get imageSoccer => AssetsData(
-    label: 'image_soccer',
-    urlPath: AppImages.imageSoccer,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  /// Image: image_tennis.webp
-  static AssetsData get imageTennis => AssetsData(
-    label: 'image_tennis',
-    urlPath: AppImages.imageTennis,
-    oldVersion: 1,
-    newVersion: 1,
-  );
-
-  // ===== HELPER METHODS =====
-
-  /// Tất cả icons cần versioning
-  /// Register trong app.dart: AssetsCacheManager.registerAssets(AppAssetsData.allIcons)
-  static List<AssetsData> get allIcons => [
-    // Selected icons
-    iconBasketballSelected,
-    iconFootballSelected,
-    iconTennisSelected,
-    iconVolleyballSelected,
-    iconTableTennisSelected,
-    iconBet1Selected,
-    iconChatSelected,
-    iconSettingSelected,
-    iconSupportSelected,
-    iconTrophySelected,
-    iconEventSelected,
-    iconChartSelected,
-    // Regular icons
-    iconBasketball,
-    iconSoccer,
-    soccer,
-    tennis,
-    iconVolleyball,
-    volleyball,
-    iconBarChart,
-    iconChart,
-    iconParlay,
-    chevronUp,
-    sportStatusSelected,
-    iconS,
-    iconMenuSelected,
-    iconSoccerSelected,
-    iconHomeSport,
-    iconComingSport,
-    iconFavoriteSport,
-  ];
-
-  /// Tất cả images cần versioning
-  static List<AssetsData> get allImages => [
-    // Common images
-    live,
-    headerShadow,
-    avatar,
-    btnRefill,
-    // Person images
-    personSoccer,
-    personTennis,
-    personVolleyball,
-    // personTableTennis,
-    // personHorseRacing,
-    // League logos
-    logoBundesliga,
-    logoChampion,
-    logoLaliga,
-    logoLeague1,
-    logoPremileague,
-    logoSeriA,
-    // Brand logos
-    logoSun88,
-    logoS88Home,
-    // Backgrounds
-    backgroundBalance,
-    backgroundBetDialog,
-    backgroundHot,
-    backgroundHotTablet,
-    // Sport images
-    imageSoccer,
-    imageTennis,
-  ];
-
-  /// Tất cả assets (icons + images)
-  /// Register trong app.dart: AssetsCacheManager.registerAssets(AppAssetsData.all)
-  static List<AssetsData> get all => [...allIcons, ...allImages];
+  /// Sinh label deterministic từ URL (làm cache key prefix).
+  /// Lấy filename, strip extension, sanitize special chars → snake_case.
+  ///
+  /// Caveat: 2 URLs cùng filename ở 2 thư mục/CDN khác → label trùng.
+  /// App hiện tại tất cả assets đều ở 1 CDN root → an toàn. Nếu sau này có
+  /// CDN thứ 2, cần thêm namespace prefix vào label để tránh collision.
+  static String _labelOf(String url) {
+    final filename = url.split('/').last;
+    final base = filename
+        .replaceAll(RegExp(r'\.\w+$'), '') // strip extension
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_'); // sanitize
+    return 'asset_$base';
+  }
 }

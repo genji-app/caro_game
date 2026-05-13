@@ -56,8 +56,12 @@ sealed class BetSlip with _$BetSlip {
 
 extension BetSlipX on BetSlip {
   /// Get settlement status enum
-  SettlementStatusEnum get settlementStatusEnum =>
-      SettlementStatusEnum.fromString(settlementStatus);
+  /// Prioritizes BetSlipStatus (e.g. Declined) when settlementStatus is empty
+  SettlementStatusEnum get settlementStatusEnum {
+    if (status == BetSlipStatus.declined) return SettlementStatusEnum.declined;
+    if (status == BetSlipStatus.cashout) return SettlementStatusEnum.cashout;
+    return SettlementStatusEnum.fromString(settlementStatus);
+  }
 
   /// Get sport type enum default is football
   SportType? get sport => SportType.fromId(sportId);
@@ -82,9 +86,11 @@ extension BetSlipX on BetSlip {
       case BetSlipStatus.settled:
         return true;
 
+      case BetSlipStatus.declined:
+        return true;
+
       case BetSlipStatus.active:
       case BetSlipStatus.running:
-      case BetSlipStatus.declined:
       case BetSlipStatus.pending:
       case BetSlipStatus.unknown:
         return false;

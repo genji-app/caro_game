@@ -5,17 +5,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Scroll-driven hide/show controller for header and bottom navigation.
 ///
-/// Uses ValueNotifier for per-frame updates — more efficient than Riverpod
-/// StateNotifier for scroll-driven animations that update every ~16ms.
+/// Uses [ValueNotifier] for per-frame updates — more efficient than Riverpod
+/// [StateNotifier] for scroll-driven animations that update every ~16ms.
 ///
-/// [progress]: 0.0 = fully visible, 1.0 = hidden (header shows 0.5px residual).
+/// [progress]: 0.0 = fully visible, 1.0 = hidden ([minVisibleHeight] residual).
 class ScrollHideNotifier {
   // === Config ===
   static const double headerHeight = 68.0;
   static const double minVisibleHeight = 1.0;
-  static const double maxOffset = headerHeight - minVisibleHeight; // 66.0
+  static const double maxOffset = headerHeight - minVisibleHeight; // 67.0
   static const double snapThreshold = 0.5;
   static const Duration snapDuration = Duration(milliseconds: 200);
+  static const Duration _startupPause = Duration(milliseconds: 1000);
 
   // === State ===
   final ValueNotifier<double> progress = ValueNotifier(0.0);
@@ -24,7 +25,40 @@ class ScrollHideNotifier {
 
   ScrollHideNotifier() {
     // Pause on startup to avoid collapse from initial render scroll events
-    _pauseUntil = DateTime.now().add(const Duration(milliseconds: 1000));
+    _pauseUntil = DateTime.now().add(_startupPause);
+  }
+
+  // === Scroll metrics (content size) handling ===
+  //
+  // NOTE: [ScrollMetricsNotification] does NOT extend [ScrollNotification] —
+  // it only mixes in `ViewportNotificationMixin`. A
+  // `NotificationListener<ScrollNotification>` will never receive it, so a
+  // separate `NotificationListener<ScrollMetricsNotification>` must forward
+  // events to this method.
+  void handleScrollMetricsNotification(ScrollMetricsNotification notification) {
+    if (_isBeforePauseUntil()) return;
+    if (notification.depth != 0) return;
+    ensureRevealableOrShow(notification.metrics);
+  }
+
+  /// Ensures the header is reachable by the current scrollable. If the
+  /// scroll range is smaller than [maxOffset], the user can never scroll up
+  /// far enough to drive [progress] back to 0 on their own, so the header is
+  /// animated back into view.
+  ///
+  /// Covers two cases:
+  ///   - `maxScrollExtent == minScrollExtent` (content fits the viewport)
+  ///   - `maxScrollExtent - minScrollExtent < maxOffset` (slightly scrollable
+  ///     but not enough headroom to reveal a hidden header)
+  ///
+  /// Returns `true` if a snap-animation was triggered.
+  bool ensureRevealableOrShow(ScrollMetrics metrics) {
+    final scrollRange = metrics.maxScrollExtent - metrics.minScrollExtent;
+    if (scrollRange < maxOffset && progress.value != 0.0) {
+      _animateSnapTo(0.0);
+      return true;
+    }
+    return false;
   }
 
   // === Scroll handling ===
@@ -35,6 +69,17 @@ class ScrollHideNotifier {
     if (notification is ScrollUpdateNotification) {
       final delta = notification.scrollDelta ?? 0.0;
       final metrics = notification.metrics;
+
+      // Viewport chứa hết content → force show, bỏ qua update.
+      // (Safety net phòng trường hợp ScrollMetricsNotification không fire.)
+      final canScroll = metrics.maxScrollExtent > metrics.minScrollExtent;
+      if (!canScroll) {
+        if (progress.value != 0.0) {
+          _snapTimer?.cancel();
+          progress.value = 0.0;
+        }
+        return;
+      }
 
       // Skip iOS bounce / overscroll
       if (metrics.outOfRange) return;
@@ -91,11 +136,6 @@ class ScrollHideNotifier {
   void show() {
     _snapTimer?.cancel();
     progress.value = 0.0;
-  }
-
-  void hide() {
-    _snapTimer?.cancel();
-    progress.value = 1.0;
   }
 
   void pauseDetection([Duration duration = const Duration(milliseconds: 500)]) {

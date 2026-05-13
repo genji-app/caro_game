@@ -519,18 +519,24 @@ class SbHttpManager {
   Future<Map<String, dynamic>> calculateBets(
     Map<String, dynamic> body, {
     bool isV2 = false,
-  }) => SbBettingService.instance.calculateBets(body, isV2: isV2);
+    int? sportId,
+  }) => SbBettingService.instance.calculateBets(body, isV2: isV2, sportId: sportId);
 
-  Future<Map<String, dynamic>> calculateBetsParlay(Map<String, dynamic> body) =>
-      SbBettingService.instance.calculateBetsParlay(body);
+  Future<Map<String, dynamic>> calculateBetsParlay(
+    Map<String, dynamic> body, {
+    int? sportId,
+  }) => SbBettingService.instance.calculateBetsParlay(body, sportId: sportId);
 
   Future<Map<String, dynamic>> placeBets(
     Map<String, dynamic> body, {
     bool isV2 = false,
-  }) => SbBettingService.instance.placeBets(body, isV2: isV2);
+    int? sportId,
+  }) => SbBettingService.instance.placeBets(body, isV2: isV2, sportId: sportId);
 
-  Future<Map<String, dynamic>> placeBetsParlay(Map<String, dynamic> body) =>
-      SbBettingService.instance.placeBetsParlay(body);
+  Future<Map<String, dynamic>> placeBetsParlay(
+    Map<String, dynamic> body, {
+    int? sportId,
+  }) => SbBettingService.instance.placeBetsParlay(body, sportId: sportId);
 
   // ===== BET HISTORY METHODS - delegate to SbBettingService =====
 

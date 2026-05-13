@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:co_caro_flame/s88/core/utils/extensions/image_helper.dart';
+import 'package:co_caro_flame/s88/core/utils/styles/app_color_styles.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_icons.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_images.dart';
 import 'package:co_caro_flame/s88/core/utils/styles/app_text_styles.dart';
@@ -26,25 +27,28 @@ class WithdrawPaymentMethodCard extends StatelessWidget {
     onTap: onTap,
     borderRadius: BorderRadius.circular(12),
     child: Container(
-      decoration: BoxDecoration(
-        color: AppColors.gray900,
-        border: isSelected
-            ? Border.all(
+      decoration: isSelected
+          ? BoxDecoration(
+              color: AppColors.gray900, // #1b1a19
+              border: Border.all(
                 color: const Color(0xFFF9DBAF).withValues(alpha: 0.2),
                 width: 0.5,
-              )
-            : null,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.12),
-            offset: const Offset(0, 0.5),
-            blurRadius: 0.5,
-            spreadRadius: 0,
-            blurStyle: BlurStyle.inner,
-          ),
-        ],
-      ),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  offset: const Offset(0, 0.5),
+                  blurRadius: 0.5,
+                  spreadRadius: 0,
+                  blurStyle: BlurStyle.inner,
+                ),
+              ],
+            )
+          : BoxDecoration(
+              color: AppColorStyles.backgroundTertiary,
+              borderRadius: BorderRadius.circular(12),
+            ),
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
@@ -65,8 +69,8 @@ class WithdrawPaymentMethodCard extends StatelessWidget {
               bottom: 0,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(11),
-                child: ImageHelper.getNetworkImage(
-                  imageUrl: AppImages.activatedglow,
+                child: ImageHelper.load(
+                  path: AppImages.activatedglow,
                   fit: BoxFit.cover,
                 ),
               ),

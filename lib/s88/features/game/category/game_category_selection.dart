@@ -1,22 +1,21 @@
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
-
-import '../models/models.dart';
+import 'package:co_caro_flame/s88/core/constants/i18n.dart';
+import 'package:co_caro_flame/s88/features/game/game.dart';
 
 /// Selection state for game categories.
-/// Simplified to use only the [GameCategory] model for single-level selection.
+/// Simplified to use only the [CaxiloCategory] model for single-level selection.
 class GameCategorySelection {
   /// The selected category (null means "All")
-  final GameCategory? category;
+  final CaxiloCategory? category;
 
   const GameCategorySelection({this.category});
 
   /// Create selection from a category.
-  factory GameCategorySelection.fromCategory(GameCategory category) {
+  factory GameCategorySelection.fromCategory(CaxiloCategory category) {
     return GameCategorySelection(category: category);
   }
 
   GameCategorySelection copyWith({
-    GameCategory? category,
+    CaxiloCategory? category,
     bool clearCategory = false,
   }) {
     return GameCategorySelection(
@@ -31,9 +30,14 @@ class GameCategorySelection {
   bool get isNotEmpty => !isEmpty;
 
   /// Get a user-friendly label for this selection
-  String get label => category?.label ?? 'Tất cả';
+  String get label => category?.displayName ?? I18n.txtGameCategoryAll;
 
-  /// Check if a game block matches the current selection
+  /// Check if a game block matches the current selection.
+  ///
+  /// ⚠️ Does NOT work correctly for collection-based categories
+  /// (e.g., `newgames`, `featured`) because [collections] is not available here.
+  /// Prefer [GameCategorySelectionX.toFilter] + [CaxiloRepository.getGames]
+  /// for the correct filtering path.
   bool matches(GameBlock gameBlock) {
     if (isEmpty) return true;
     return category!.matches(gameBlock);

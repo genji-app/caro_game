@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart'; // Added for kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:orientation_guard/src/models/orientation_models.dart';
@@ -9,26 +10,38 @@ class NativeOrientationController implements OrientationController {
   /// Creates a new [NativeOrientationController].
   const NativeOrientationController();
 
-  static const _defaultSystemUiMode = SystemUiMode.edgeToEdge;
-  static const _defaultSystemUiOverlays = SystemUiOverlay.values;
-
   @override
   Future<OrientationViewState> apply(OrientationPolicy policy) async {
     debugPrint('Native applies policy: ${policy.targets.map((t) => t.name).join(', ')}');
 
     try {
-      if (policy.screenUi.immersive) {
-        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-      } else {
-        await SystemChrome.setEnabledSystemUIMode(_defaultSystemUiMode);
+      final requested = policy.targets.isEmpty ? DeviceOrientation.values : policy.targets;
+
+      // WORKAROUND (iOS Error 101): On iOS 16+, requesting a specific orientation
+      // (like landscape) while the view controller's mask is restricted can fail.
+      // We 'flush' the mask by briefly allowing all orientations before applying the target.
+      final isIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+      if (isIos) {
+        await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
       }
 
-      final requested = policy.targets;
+      // SECONDARY WORKAROUND: Forcing a single specific portrait orientation
+      // if we are returning to portrait, helping to break stubborn sensor locks.
+      // This is primarily for iOS where sensor locks are common after immersive sessions.
+      final needsLockBreak = isIos &&
+          requested.contains(DeviceOrientation.portraitUp) &&
+          !requested.contains(DeviceOrientation.landscapeLeft);
 
-      if (requested.isEmpty) {
-        requested.addAll(DeviceOrientation.values);
+      if (needsLockBreak) {
+        debugPrint('Forcing temporary PortraitUp (iOS only) to break rotation lock...');
+        await SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+        ]);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
       }
 
+      debugPrint('Finalizing native orientation: ${requested.join(', ')}');
       await SystemChrome.setPreferredOrientations(requested);
 
       return OrientationViewState(
@@ -54,10 +67,6 @@ class NativeOrientationController implements OrientationController {
 
     try {
       await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-      await SystemChrome.setEnabledSystemUIMode(
-        _defaultSystemUiMode,
-        overlays: _defaultSystemUiOverlays,
-      );
     } catch (e, stack) {
       debugPrint('Failed to restore native orientation: $e\n$stack');
     }
@@ -79,3 +88,6 @@ class NativeOrientationController implements OrientationController {
     });
   }
 }
+
+/// Provides the native implementation of [OrientationController].
+OrientationController getPlatformController() => const NativeOrientationController();

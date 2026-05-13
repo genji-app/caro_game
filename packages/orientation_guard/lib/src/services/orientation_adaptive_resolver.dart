@@ -21,11 +21,21 @@ class OrientationAdaptiveResolver extends OrientationPolicyResolver<void> {
   /// - Desktop (>= 900): Both
   @override
   OrientationPolicy resolve(BuildContext context, [void input]) {
-    final shortestSide = MediaQuery.sizeOf(context).shortestSide;
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) {
+      return const OrientationPolicy(
+        targets: DeviceOrientations.both,
+        blockOnWebMismatch: false,
+        debugLabel: 'AdaptiveFallback',
+      );
+    }
+
+    final shortestSide = mediaQuery.size.shortestSide;
     final isMobile = shortestSide < mobileBreakpoint;
 
     return OrientationPolicy(
       targets: isMobile ? DeviceOrientations.portrait : DeviceOrientations.both,
+      blockOnWebMismatch: false, // Don't block the root app on mobile web rotation
       debugLabel: isMobile ? 'AdaptiveDefaultPortrait' : 'AdaptiveDefaultBoth',
     );
   }

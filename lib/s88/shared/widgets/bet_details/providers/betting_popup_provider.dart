@@ -591,7 +591,7 @@ class BettingPopupNotifier extends StateNotifier<BettingPopupState> {
         leagueId: bettingData.getLeagueIdString(),
         matchTime: bettingData.getMatchTimeISO(),
         isLive: bettingData.isLive,
-        sportId: 1,
+        sportId: bettingData.sportId,
         homeScore: bettingData.eventData.homeScore,
         awayScore: bettingData.eventData.awayScore,
         stake: actualStake.toDouble(),

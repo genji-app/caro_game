@@ -51,6 +51,63 @@ class SbConfigLoader {
     }
   }
 
+  /// Load remote config trả về **plain JSON** (không qua base64).
+  ///
+  /// Dùng cho các URL config trả thẳng JSON object như:
+  /// `config_download_app.json` v.v.
+  ///
+  /// Vẫn giữ cache-busting query param và timeout 10s như [getConfig].
+  ///
+  /// Example:
+  /// ```dart
+  /// final json = await SbConfigLoader.getConfigJson('https://.../config.json');
+  /// ```
+  static Future<Map<String, dynamic>> getConfigJson(String url) async {
+    try {
+      final randomParam = '?r=${Random().nextDouble()}';
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+
+      final response = await dio.get<dynamic>(url + randomParam);
+
+      final data = response.data;
+      if (data == null) {
+        throw Exception('Empty config response');
+      }
+
+      // Dio có thể auto-parse JSON khi server trả `application/json` →
+      // data đã là Map. Nếu server trả `text/plain` thì data là String và
+      // ta tự jsonDecode.
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      if (data is String) {
+        if (data.isEmpty) {
+          throw Exception('Empty config response');
+        }
+        final decoded = jsonDecode(data);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+        throw Exception('Config JSON root is not an object');
+      }
+
+      throw Exception('Unsupported config response type: ${data.runtimeType}');
+    } catch (e) {
+      throw Exception('Failed to load config: $e');
+    }
+  }
+
   // ===== SETTINGS PARSER =====
 
   /// Parse settings from API response.

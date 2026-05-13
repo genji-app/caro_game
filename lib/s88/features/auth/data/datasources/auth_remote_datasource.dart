@@ -143,12 +143,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     };
 
     // Add tracking params if provided
-    if (request.affId != null) body['affId'] = request.affId;
-    if (request.utmSource != null) body['utmSource'] = request.utmSource;
-    if (request.utmMedium != null) body['utmMedium'] = request.utmMedium;
-    if (request.utmCampaign != null) body['utmCampaign'] = request.utmCampaign;
-    if (request.utmContent != null) body['utmContent'] = request.utmContent;
-    if (request.utmTerm != null) body['utmTerm'] = request.utmTerm;
+    // if (request.affId != null) body['affId'] = request.affId;
+    // if (request.utmSource != null) body['utmSource'] = request.utmSource;
+    // if (request.utmMedium != null) body['utmMedium'] = request.utmMedium;
+    // if (request.utmCampaign != null) body['utmCampaign'] = request.utmCampaign;
+    // if (request.utmContent != null) body['utmContent'] = request.utmContent;
+    // if (request.utmTerm != null) body['utmTerm'] = request.utmTerm;
 
     // Call API - idServiceUrl directly, no additional path
     final response = await http.post(

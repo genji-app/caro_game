@@ -344,13 +344,19 @@ class SbApiEndpoints {
   }
 
   /// Build place bets URL
+  /// Soccer (sportId=1): query param format
+  /// Other sports: path param format
   static String buildPlaceBetsUrl(String baseUrl, int sportId) {
-    return '$baseUrl$placeBets?sportId=$sportId';
+    if (sportId == 1) return '$baseUrl$placeBets?sportId=$sportId';
+    return '$baseUrl$placeBets/sport/$sportId';
   }
 
   /// Build place bets V2 URL
+  /// Soccer (sportId=1): query param format
+  /// Other sports: path param format
   static String buildPlaceBetsV2Url(String baseUrl, int sportId) {
-    return '$baseUrl$placeBetsV2?sportId=$sportId';
+    if (sportId == 1) return '$baseUrl$placeBetsV2?sportId=$sportId';
+    return '$baseUrl$placeBetsV2/sport/$sportId';
   }
 
   /// Build get cash out URL

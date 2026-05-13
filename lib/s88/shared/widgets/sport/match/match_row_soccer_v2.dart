@@ -308,9 +308,7 @@ class _TeamsSectionSoccerV2 extends StatelessWidget {
                 const SizedBox(width: 16),
 
                 // Soccer score display for live matches
-                if (isLive) ...[
-                  SoccerScoreSection(event: event),
-                ],
+                if (isLive) ...[SoccerScoreSection(event: event)],
               ],
             ),
 
@@ -326,8 +324,8 @@ class _TeamsSectionSoccerV2 extends StatelessWidget {
                       child: SizedBox(
                         width: 40,
                         height: 26,
-                        child: ImageHelper.getNetworkImage(
-                          imageUrl: AppImages.live,
+                        child: ImageHelper.load(
+                          path: AppImages.live,
                         ),
                       ),
                     ),

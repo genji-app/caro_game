@@ -1,32 +1,31 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:co_caro_flame/s88/core/services/repositories/game_repository/game_repository.dart';
 import 'package:co_caro_flame/s88/features/game/game.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GAME GROUP PROVIDER (GENERIC)
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Generic family provider that returns games for a specific [GameFilter]
+/// Generic family provider that returns games for a specific [CaxiloFilter]
 /// as a List of [GameBlock].
 ///
 /// **Usage:**
 /// ```dart
 /// // Fetch games for the "Live Casino" category
 /// final liveCasinoGames = ref.watch(gameGroupProvider(
-///   const GameCategory.gameType(
+///   const CaxiloCategory.gameType(
 ///     type: GameType.live,
-///     displayLabel: 'Live Casino',
+///     translationKey: 'txt_game_category_live_dealer',
 ///   ).toFilter()
 /// ));
 /// ```
 ///
-/// Uses [GameRepository.getGames] with the filter automatically extracted
-/// from the provided [GameCategory].
+/// Uses [CaxiloRepository.getGames] with the filter automatically extracted
+/// from the provided [CaxiloCategory].
 /// Returns `null` if no games are available.
 final gameGroupProvider = FutureProvider.family
-    .autoDispose<List<GameBlock>, GameFilter>((ref, filter) async {
+    .autoDispose<List<GameBlock>, CaxiloFilter>((ref, filter) async {
       // 1. NGĂN CHẶN RELOAD KHI SCROLL (KeepAlive Timer)
       // Khi widget chứa provider này bị unmount (kéo ra khỏi màn hình),
       // nó sẽ không bị huỷ ngay lập tức mà giữ lại cache trong 5 phút.
@@ -36,9 +35,9 @@ final gameGroupProvider = FutureProvider.family
 
       // Watch repository events so this provider re-runs when
       // the cache is refreshed (e.g., remote data arrives after warmup).
-      ref.watch(gameEventsProvider);
+      ref.watch(caxiloEventsProvider);
 
-      final repository = ref.watch(gameRepositoryProvider);
+      final repository = ref.watch(caxiloRepositoryProvider);
 
       return repository.getGames(filter: filter);
     });

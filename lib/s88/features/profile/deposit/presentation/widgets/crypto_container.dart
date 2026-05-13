@@ -170,8 +170,8 @@ class _CryptoContainerState extends ConsumerState<CryptoContainer> {
                                     borderRadius: BorderRadius.circular(16),
                                     child:
                                         _isWebP(_getCryptoIconPath(crypto.name))
-                                        ? ImageHelper.getNetworkImage(
-                                            imageUrl: _getCryptoIconPath(
+                                        ? ImageHelper.load(
+                                            path: _getCryptoIconPath(
                                               crypto.name,
                                             ),
                                             width: 32,

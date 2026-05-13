@@ -1,0 +1,68 @@
+import 'package:flutter/foundation.dart';
+import 'package:casino_settings/casino_settings.dart';
+
+import '../models/models.dart';
+
+/// Mixin responsible for building dynamic game categories from remote settings.
+mixin GameCategoryMixin {
+  /// Settings client for accessing category configuration.
+  CasinoSettingsClient get settingsClient;
+
+  /// Returns the default "Lobby" (All Games) category.
+  GameCategory getLobbyCategory() {
+    return const GameCategory.all(
+      icon: 'ic_home.svg',
+      iconActive: 'ic_home_yellow.svg',
+    );
+  }
+
+  /// Returns the complete list of game categories.
+  ///
+  /// This includes in-house categories (Sunwin), standard game types
+  /// (Slots, Sports, etc.), and custom categories (New Games) as defined
+  /// in the remote configuration.
+  GameCategories getGameCategories() {
+    final remoteCategories = settingsClient.config?.categories ?? [];
+
+    if (remoteCategories.isEmpty) {
+      debugPrint('⚠️ GameRepository: No categories found in configuration');
+      // Return empty or fallback categories if needed
+      return GameCategories(all: getLobbyCategory(), categories: []);
+    }
+
+    final domainCategories = remoteCategories.map((remote) {
+      return remote.when(
+        gameType: (id, translationKey, icon, iconActive, gameType) {
+          return GameCategory.gameType(
+            type: gameType,
+            translationKey: translationKey,
+            icon: icon,
+            iconActive: iconActive,
+          );
+        },
+        inHouse: (id, translationKey, icon, iconActive) {
+          return GameCategory.inHouse(
+            translationKey: translationKey,
+            icon: icon,
+            iconActive: iconActive,
+          );
+        },
+        custom: (id, translationKey, icon, iconActive, strategy, params) {
+          final filter = GameFilter.fromStrategy(strategy, params);
+          return GameCategory.custom(
+            categoryId: id,
+            translationKey: translationKey,
+            icon: icon,
+            iconActive: iconActive,
+            filter: filter,
+          );
+        },
+      );
+    }).toList();
+
+    return GameCategories(
+      all: getLobbyCategory(),
+      categories: domainCategories,
+    );
+  }
+}

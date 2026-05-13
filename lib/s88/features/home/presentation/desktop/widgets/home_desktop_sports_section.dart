@@ -200,8 +200,8 @@ class HomeDesktopSportsSection extends ConsumerWidget {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: ImageHelper.getNetworkImage(
-                  imageUrl: imagePath,
+                child: ImageHelper.load(
+                  path: imagePath,
                   fit: BoxFit.cover,
                 ),
               ),

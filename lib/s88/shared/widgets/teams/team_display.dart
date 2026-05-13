@@ -27,8 +27,8 @@ class TeamDisplay extends StatelessWidget {
         //         height: 28,
         //         child: ClipRRect(
         //           borderRadius: BorderRadius.circular(1000),
-        //           child: ImageHelper.getNetworkImage(
-        //             imageUrl: teamLogo!,
+        //           child: ImageHelper.load(
+        //             path: teamLogo!,
         //             fit: BoxFit.contain,
         //           ),
         //         ),

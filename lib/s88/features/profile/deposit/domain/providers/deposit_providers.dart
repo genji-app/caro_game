@@ -116,6 +116,38 @@ final configDepositProvider = FutureProvider.autoDispose<FetchBankAccountsData>(
   },
 );
 
+/// Whether at least one bank in the deposit config has a usable account.
+/// Used by the deposit UI to decide whether to render the "Ngân hàng" tab.
+///
+/// Behavior:
+///   - data + empty list → false (hide tab)
+///   - data + non-empty list → true (show tab)
+///   - loading / error → true (don't hide on uncertain states)
+final hasBankAccountsProvider = Provider.autoDispose<bool>((ref) {
+  final banksAsync = ref.watch(bankListProvider);
+  return banksAsync.when(
+    data: (banks) => banks.isNotEmpty,
+    loading: () => true,
+    error: (_, __) => true,
+  );
+});
+
+/// Whether the deposit config exposes at least one e-wallet entry.
+/// Used by the deposit UI to decide whether to render the "Ví điện tử" tab.
+///
+/// Behavior mirrors [hasBankAccountsProvider]:
+///   - data + empty list → false (hide tab)
+///   - data + non-empty list → true (show tab)
+///   - loading / error → true (don't hide on uncertain states)
+final hasEWalletsProvider = Provider.autoDispose<bool>((ref) {
+  final walletsAsync = ref.watch(walletListProvider);
+  return walletsAsync.when(
+    data: (wallets) => wallets.isNotEmpty,
+    loading: () => true,
+    error: (_, __) => true,
+  );
+});
+
 /// Wallet list provider for e-wallet
 /// Gets wallets from cashoutGiftCards with bankType=2
 final walletListProvider = FutureProvider<List<CodepayBank>>((ref) async {
@@ -128,67 +160,145 @@ final walletListProvider = FutureProvider<List<CodepayBank>>((ref) async {
   return eWallets;
 });
 
-/// Card type list provider for scratch card
-/// Gets card types from cashoutGiftCards based on name
+/// Card type list provider for scratch card (used by WITHDRAW).
+/// Gets card types from `cashoutGiftCards`.
+///
+/// NOTE: For DEPOSIT use [telcoListProvider] instead — deposit "Thẻ cào"
+/// reads from a separate `telcos` list returned by the same paygate config.
 final cardTypeListProvider = FutureProvider<List<CashoutGiftCard>>((ref) async {
   final depositData = await ref.read(configDepositProvider.future);
-
-  // Extract card type names from cashoutGiftCards
   return depositData.cashoutGiftCards;
 });
 
-/// Denomination list provider for scratch card (family provider)
-/// Gets denominations from items of selected card type
-/// Pass card type name as parameter, returns empty list if null
+/// Telco list provider for scratch card (used by DEPOSIT).
+/// Gets telcos from `depositData.telcos` (Viettel, Mobifone, ...).
 ///
-/// Performance: Uses ref.watch() with cached provider (keepAlive: true)
-/// Only rebuilds when data actually changes, not on every widget rebuild
+/// Same shape (`List<CashoutGiftCard>`) as [cardTypeListProvider] but reads
+/// from a different field of the paygate config response.
+///
+/// Telcos without `exchangeRates` (e.g. Vinaphone, Vietnamobile in current
+/// config) are filtered out — selecting them would leave the denomination
+/// dropdown empty and crash `showMenu`. They're hidden until backend
+/// re-enables them with rates.
+final telcoListProvider = FutureProvider<List<CashoutGiftCard>>((ref) async {
+  final depositData = await ref.read(configDepositProvider.future);
+  return depositData.telcos
+      .where((CashoutGiftCard t) => t.exchangeRates.isNotEmpty)
+      .toList();
+});
+
+/// Denomination list provider for scratch card (used by WITHDRAW).
+/// Reads from `cashoutGiftCards`.
+/// Pass card type name as parameter; returns empty list if null/not-found.
+///
+/// Performance: Uses ref.watch() with cached provider (keepAlive: true).
 final denominationListProvider = Provider.family<List<String>, String?>((
   ref,
   cardTypeName,
 ) {
-  if (cardTypeName == null || cardTypeName.isEmpty) {
-    return [];
+  return _denominationsFor(
+    ref: ref,
+    name: cardTypeName,
+    pickList: (data) => data.cashoutGiftCards,
+  );
+});
+
+/// Denomination list provider for scratch card (used by DEPOSIT).
+/// Reads from `telcos[i].exchangeRates` (NOT `items`, which is empty for
+/// telco entries returned by the paygate config).
+final telcoDenominationListProvider = Provider.family<List<String>, String?>((
+  ref,
+  telcoName,
+) {
+  if (telcoName == null || telcoName.isEmpty) {
+    return const [];
   }
 
-  // Watch configDepositProvider but only rebuild when data changes
-  // Since configDepositProvider is cached with keepAlive, this won't cause unnecessary rebuilds
   final depositDataAsync = ref.watch(configDepositProvider);
-
   return depositDataAsync.when(
     data: (depositData) {
-      // Find the selected card by name
       try {
-        final selectedCard = depositData.cashoutGiftCards.firstWhere(
-          (CashoutGiftCard card) => card.name == cardTypeName,
+        final selectedTelco = depositData.telcos.firstWhere(
+          (CashoutGiftCard t) => t.name == telcoName,
         );
 
-        // Extract denominations from items (format amount with commas)
         final denominations =
-            selectedCard.items
-                .where(
-                  (CashoutGiftCardItem item) => item.active,
-                ) // Only active items
-                .map((CashoutGiftCardItem item) => _formatAmount(item.amount))
-                .toSet() // Remove duplicates
+            selectedTelco.exchangeRates
+                .map(_extractAmount)
+                .whereType<int>()
+                .map(_formatAmount)
+                .toSet()
                 .toList()
               ..sort((String a, String b) {
-                // Sort by numeric value
                 final aValue = int.tryParse(a.replaceAll(',', '')) ?? 0;
                 final bValue = int.tryParse(b.replaceAll(',', '')) ?? 0;
                 return aValue.compareTo(bValue);
               });
 
         return denominations;
-      } catch (e) {
-        // Card not found, return empty list
-        return [];
+      } catch (_) {
+        return const [];
       }
     },
-    loading: () => [],
-    error: (_, __) => [],
+    loading: () => const [],
+    error: (_, __) => const [],
   );
 });
+
+/// Coerces a `Map<String, dynamic>` exchange-rate row's `amount` field into
+/// an int. Returns null if the field is missing or unparseable.
+int? _extractAmount(Map<String, dynamic> rate) {
+  final raw = rate['amount'];
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  if (raw is String) {
+    return int.tryParse(raw.replaceAll(',', '').replaceAll('.', ''));
+  }
+  return null;
+}
+
+/// Shared logic for extracting + formatting denominations of the selected
+/// CashoutGiftCard from a chosen list (cashoutGiftCards or telcos).
+List<String> _denominationsFor({
+  required Ref ref,
+  required String? name,
+  required List<CashoutGiftCard> Function(FetchBankAccountsData) pickList,
+}) {
+  if (name == null || name.isEmpty) {
+    return const [];
+  }
+
+  final depositDataAsync = ref.watch(configDepositProvider);
+
+  return depositDataAsync.when(
+    data: (depositData) {
+      try {
+        final list = pickList(depositData);
+        final selectedCard = list.firstWhere(
+          (CashoutGiftCard card) => card.name == name,
+        );
+
+        final denominations =
+            selectedCard.items
+                .where((CashoutGiftCardItem item) => item.active)
+                .map((CashoutGiftCardItem item) => _formatAmount(item.amount))
+                .toSet()
+                .toList()
+              ..sort((String a, String b) {
+                final aValue = int.tryParse(a.replaceAll(',', '')) ?? 0;
+                final bValue = int.tryParse(b.replaceAll(',', '')) ?? 0;
+                return aValue.compareTo(bValue);
+              });
+
+        return denominations;
+      } catch (_) {
+        return const [];
+      }
+    },
+    loading: () => const [],
+    error: (_, __) => const [],
+  );
+}
 
 /// Helper function to format amount with commas
 /// Uses simple string manipulation for better performance and memory efficiency

@@ -211,8 +211,8 @@ class _CryptoConfirmMoneyTransferContainerState
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: _isWebP(_getCryptoIconPath(widget.cryptoOption.name))
-                    ? ImageHelper.getNetworkImage(
-                        imageUrl: _getCryptoIconPath(widget.cryptoOption.name),
+                    ? ImageHelper.load(
+                        path: _getCryptoIconPath(widget.cryptoOption.name),
                         width: 24,
                         height: 24,
                         fit: BoxFit.cover,

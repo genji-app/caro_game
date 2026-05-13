@@ -49,9 +49,9 @@ class ComboSuccessView extends StatelessWidget {
       // ),
       // _buildActionBar(),
       Expanded(child: _buildContent()),
-      // BetSuccessFooter(
-      //   onViewMyBets: onViewMyBets,
-      // ),
+      BetSuccessFooter(
+        onViewMyBets: onViewMyBets,
+      ),
     ],
   );
 

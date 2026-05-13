@@ -107,7 +107,8 @@ class _LeagueDetailMobileContentState
 
     final asyncLeagues = ref.watch(leagueDetailEventsProvider(leagueInfo));
     final leaguesList = asyncLeagues.valueOrNull;
-    final modelFav = leaguesList != null &&
+    final modelFav =
+        leaguesList != null &&
         leaguesList.isNotEmpty &&
         leaguesList.first.isFavorited;
     final favoriteState = ref.watch(favoriteProvider);
@@ -121,26 +122,37 @@ class _LeagueDetailMobileContentState
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          if (onBackPressed != null) ...[
-            Material(
-              color: AppColorStyles.backgroundQuaternary,
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                onTap: onBackPressed,
-                borderRadius: BorderRadius.circular(10),
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: ImageHelper.load(
-                    path: AppIcons.icBack,
-                    width: 20,
-                    height: 20,
-                    color: const Color(0xFFFFFCDB),
-                  ),
+          if (leagueInfo.leagueLogo.isNotEmpty)
+            ClipRRect(
+              key: ValueKey(leagueInfo.leagueId),
+              borderRadius: const BorderRadius.all(Radius.circular(6)),
+              child: Container(
+                color: Colors.white,
+                width: 24,
+                height: 24,
+                child: ImageHelper.load(
+                  path: leagueInfo.leagueLogo,
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.contain,
+                  errorWidget: const SizedBox(width: 24),
                 ),
               ),
+            )
+          else
+            const SizedBox(width: 24),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              leagueInfo.leagueName,
+              style: AppTextStyles.headingXSmall(
+                color: AppColorStyles.contentPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 8),
-          ],
+          ),
+          const SizedBox(width: 8),
           InkWell(
             onTap: () async {
               final notifier = ref.read(favoriteProvider.notifier);
@@ -189,36 +201,6 @@ class _LeagueDetailMobileContentState
             ),
           ),
           const SizedBox(width: 8),
-          if (leagueInfo.leagueLogo.isNotEmpty)
-            ClipRRect(
-              key: ValueKey(leagueInfo.leagueId),
-              borderRadius: const BorderRadius.all(Radius.circular(6)),
-              child: Container(
-                color: Colors.white,
-                width: 24,
-                height: 24,
-                child: ImageHelper.load(
-                  path: leagueInfo.leagueLogo,
-                  width: 24,
-                  height: 24,
-                  fit: BoxFit.contain,
-                  errorWidget: const SizedBox(width: 24),
-                ),
-              ),
-            )
-          else
-            const SizedBox(width: 24),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              leagueInfo.leagueName,
-              style: AppTextStyles.headingXSmall(
-                color: AppColorStyles.contentPrimary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
         ],
       ),
     );
@@ -233,9 +215,7 @@ class _LeagueDetailMobileContentState
     return asyncLeagues.when(
       data: (leagues) {
         if (leagues.isEmpty) {
-          return [
-            const SliverToBoxAdapter(child: SportEmptyPage()),
-          ];
+          return [const SliverToBoxAdapter(child: SportEmptyPage())];
         }
         return [
           LeagueEventsSliverV2(

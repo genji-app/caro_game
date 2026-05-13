@@ -12,13 +12,12 @@ class GameCategoryButton extends StatelessWidget {
     required this.isSelected,
     required this.onPressed,
     super.key,
-    this.badge,
     this.iconBuilder,
   });
 
   final String label;
   final bool isSelected;
-  final String? badge;
+
   final VoidCallback onPressed;
   final Widget Function(bool isSelected)? iconBuilder;
 

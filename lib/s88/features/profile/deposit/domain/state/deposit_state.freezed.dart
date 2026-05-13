@@ -3977,12 +3977,12 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function()?  submitting,TResult Function()?  success,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function()?  submitting,TResult Function( String? message)?  success,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _GiftcodeIdle() when idle != null:
 return idle();case _GiftcodeSubmitting() when submitting != null:
 return submitting();case _GiftcodeSuccess() when success != null:
-return success();case _GiftcodeError() when error != null:
+return success(_that.message);case _GiftcodeError() when error != null:
 return error(_that.message);case _:
   return orElse();
 
@@ -4001,12 +4001,12 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function()  submitting,required TResult Function()  success,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function()  submitting,required TResult Function( String? message)  success,required TResult Function( String message)  error,}) {final _that = this;
 switch (_that) {
 case _GiftcodeIdle():
 return idle();case _GiftcodeSubmitting():
 return submitting();case _GiftcodeSuccess():
-return success();case _GiftcodeError():
+return success(_that.message);case _GiftcodeError():
 return error(_that.message);}
 }
 /// A variant of `when` that fallback to returning `null`
@@ -4021,12 +4021,12 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function()?  submitting,TResult? Function()?  success,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function()?  submitting,TResult? Function( String? message)?  success,TResult? Function( String message)?  error,}) {final _that = this;
 switch (_that) {
 case _GiftcodeIdle() when idle != null:
 return idle();case _GiftcodeSubmitting() when submitting != null:
 return submitting();case _GiftcodeSuccess() when success != null:
-return success();case _GiftcodeError() when error != null:
+return success(_that.message);case _GiftcodeError() when error != null:
 return error(_that.message);case _:
   return null;
 
@@ -4103,33 +4103,67 @@ String toString() {
 
 
 class _GiftcodeSuccess implements GiftcodeSubmitState {
-  const _GiftcodeSuccess();
+  const _GiftcodeSuccess({this.message});
   
 
+ final  String? message;
 
-
+/// Create a copy of GiftcodeSubmitState
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$GiftcodeSuccessCopyWith<_GiftcodeSuccess> get copyWith => __$GiftcodeSuccessCopyWithImpl<_GiftcodeSuccess>(this, _$identity);
 
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _GiftcodeSuccess);
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _GiftcodeSuccess&&(identical(other.message, message) || other.message == message));
 }
 
 
 @override
-int get hashCode => runtimeType.hashCode;
+int get hashCode => Object.hash(runtimeType,message);
 
 @override
 String toString() {
-  return 'GiftcodeSubmitState.success()';
+  return 'GiftcodeSubmitState.success(message: $message)';
 }
 
 
 }
 
+/// @nodoc
+abstract mixin class _$GiftcodeSuccessCopyWith<$Res> implements $GiftcodeSubmitStateCopyWith<$Res> {
+  factory _$GiftcodeSuccessCopyWith(_GiftcodeSuccess value, $Res Function(_GiftcodeSuccess) _then) = __$GiftcodeSuccessCopyWithImpl;
+@useResult
+$Res call({
+ String? message
+});
 
 
+
+
+}
+/// @nodoc
+class __$GiftcodeSuccessCopyWithImpl<$Res>
+    implements _$GiftcodeSuccessCopyWith<$Res> {
+  __$GiftcodeSuccessCopyWithImpl(this._self, this._then);
+
+  final _GiftcodeSuccess _self;
+  final $Res Function(_GiftcodeSuccess) _then;
+
+/// Create a copy of GiftcodeSubmitState
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? message = freezed,}) {
+  return _then(_GiftcodeSuccess(
+message: freezed == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
+as String?,
+  ));
+}
+
+
+}
 
 /// @nodoc
 

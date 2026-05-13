@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:co_caro_flame/s88/core/utils/styles/app_color_styles.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/entities/payment_method.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/providers/deposit_overlay_provider.dart';
 import 'package:co_caro_flame/s88/features/profile/deposit/domain/providers/deposit_providers.dart';
@@ -58,7 +59,7 @@ class DepositOverlay extends ConsumerWidget {
                 maxHeight: MediaQuery.of(context).size.height * 0.9,
               ),
               decoration: BoxDecoration(
-                color: AppColors.gray950, // #111010
+                color: AppColorStyles.backgroundTertiary, // #111010
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(

@@ -36,9 +36,9 @@ class BetSuccessView extends StatelessWidget {
       // ),
       // _buildActionBar(),
       Expanded(child: _buildTicketsList()),
-      // BetSuccessFooter(
-      //   onViewMyBets: onViewMyBets,
-      // ),
+      BetSuccessFooter(
+        onViewMyBets: onViewMyBets,
+      ),
     ],
   );
 
