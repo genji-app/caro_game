@@ -1,0 +1,42 @@
+import 'game_block.dart';
+
+/// {@template game_lobby_block}
+/// Sealed class representing a single block in the game lobby.
+///
+/// The lobby is a vertical list composed of these blocks.
+/// {@endtemplate}
+sealed class GameLobbyBlock {
+  const GameLobbyBlock();
+}
+
+/// {@template game_group_block}
+/// A horizontal group of games with a display label.
+/// {@endtemplate}
+class GameGroupBlock extends GameLobbyBlock {
+  const GameGroupBlock({
+    required this.label,
+    required this.games,
+  });
+
+  /// The display title for this group.
+  final String label;
+
+  /// The list of games to be displayed in this group.
+  final List<GameBlock> games;
+}
+
+/// {@template game_banner_block}
+/// A promotional banner to be injected into the lobby.
+/// {@endtemplate}
+class GameBannerBlock extends GameLobbyBlock {
+  const GameBannerBlock({
+    required this.bannerId,
+    this.image,
+  });
+
+  /// Identifies which banner to render (e.g., "providersBanner").
+  final String bannerId;
+
+  /// Optional custom image URL for the banner.
+  final String? image;
+}

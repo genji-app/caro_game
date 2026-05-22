@@ -1,0 +1,93 @@
+import 'package:casino_settings/casino_settings.dart';
+
+import '../game_utils.dart';
+import '../models/game_block.dart';
+import '../models/game_filter.dart';
+
+/// Mixin responsible for searching and filtering games in memory.
+mixin GameSearchEngineMixin {
+  /// Utility for string normalization.
+  GameUtils get utils;
+
+  /// Settings client for accessing featured game configuration.
+  CasinoSettingsClient get settingsClient;
+
+  /// The single source of truth for the default provider ID (e.g., 'sunwin').
+  String get defaultProviderId;
+
+  /// Returns games matching the given [query] and/or [filter].
+  List<GameBlock> applySearchAndFilter(
+    List<GameBlock> games, {
+    String? query,
+    GameFilter? filter,
+  }) {
+    final rawQuery = query?.toLowerCase().trim() ?? '';
+    final normalizedQuery = rawQuery.isNotEmpty
+        ? utils.removeDiacritics(rawQuery)
+        : '';
+
+    return games.where((block) {
+      if (filter != null && !filter.matches(block)) {
+        return false;
+      }
+      return rawQuery.isEmpty ||
+          _matchesQuery(block, rawQuery, normalizedQuery);
+    }).toList();
+  }
+
+  /// Returns the top [limit] popular games from the provided list.
+  ///
+  /// Priority order:
+  /// 1. Games explicitly listed in the 'featured' section of remote settings.
+  /// 2. If 'featured' is empty, falls back to the first [limit] in-house games.
+  List<GameBlock> getPopularGamesFromList(
+    List<GameBlock> allGames, {
+    int limit = 5,
+  }) {
+    final featuredCodes = settingsClient.config?.display.featured ?? [];
+
+    if (featuredCodes.isNotEmpty) {
+      final featured = <GameBlock>[];
+      for (final code in featuredCodes) {
+        final match = allGames.where((g) => g.gameCode == code).firstOrNull;
+        if (match != null) featured.add(match);
+        if (featured.length >= limit) break;
+      }
+      if (featured.isNotEmpty) return featured;
+    }
+
+    return allGames
+        .where((b) => b.providerId.toLowerCase() == defaultProviderId)
+        .take(limit)
+        .toList();
+  }
+
+  /// Returns `true` if [block] matches the search term [q].
+  bool _matchesQuery(GameBlock block, String q, String normalizedQuery) {
+    if (q.isEmpty) return true;
+
+    final query = q.toLowerCase();
+
+    // 1. Check direct matches (ID, Code, Name)
+    final matchesRaw =
+        block.gameName.toLowerCase().contains(query) ||
+        block.gameCode.toLowerCase().contains(query) ||
+        block.productId.toLowerCase().contains(query) ||
+        block.providerName.toLowerCase().contains(query) ||
+        block.providerId.toLowerCase().contains(query);
+
+    if (matchesRaw) return true;
+
+    // 2. Advanced: Normalized matching (e.g. "tai xiu" matches "Tài Xỉu")
+    if (normalizedQuery.isEmpty) return false;
+
+    return utils
+            .removeDiacritics(block.gameName)
+            .toLowerCase()
+            .contains(normalizedQuery) ||
+        utils
+            .removeDiacritics(block.providerName)
+            .toLowerCase()
+            .contains(normalizedQuery);
+  }
+}

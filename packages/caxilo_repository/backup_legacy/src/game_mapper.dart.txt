@@ -1,0 +1,176 @@
+import 'package:game_api_client/game_api_client.dart' as gac;
+import 'package:casino_settings/casino_settings.dart';
+
+import 'models/game_block.dart';
+
+/// Mapper and extensions to handle conversion between [GameType] and [gac.GameType].
+///
+/// This is placed in the repository layer to keep [casino_settings] clean
+/// of [game_api_client] dependencies.
+extension GameTypeMapper on GameType {
+  /// Maps [gac.GameType] from the API client to our local [GameType].
+  static GameType fromPackageGameType(gac.GameType? packageType) {
+    if (packageType == null) return GameType.unknown;
+
+    // Use value-based mapping for stability
+    return switch (packageType.value) {
+      1 => GameType.slot,
+      2 => GameType.sport,
+      3 => GameType.jackpot,
+      4 => GameType.card,
+      5 => GameType.dice,
+      6 => GameType.live,
+      7 => GameType.lottery,
+      8 => GameType.miniGame,
+      9 => GameType.fishing,
+      20 => GameType.others,
+      _ => GameType.fromJson(packageType.name),
+    };
+  }
+
+  /// Maps our local [GameType] back to [gac.GameType].
+  gac.GameType toPackageGameType() {
+    return switch (this) {
+      GameType.slot => gac.GameType.slot,
+      GameType.sport => gac.GameType.sport,
+      GameType.jackpot => gac.GameType.jackpot,
+      GameType.card => gac.GameType.card,
+      GameType.dice => gac.GameType.dice,
+      GameType.live => gac.GameType.live,
+      GameType.lottery => gac.GameType.lottery,
+      GameType.miniGame => gac.GameType.miniGame,
+      GameType.fishing => gac.GameType.fishing,
+      GameType.others => gac.GameType.others,
+      GameType.unknown => gac.GameType.unknown,
+    };
+  }
+}
+
+/// {@template game_block_mapper}
+/// A dedicated mapper responsible for transforming various data sources
+/// (Remote API, In-house Config) into [GameBlock] domain models.
+/// {@endtemplate}
+class GameBlockMapper {
+  GameBlockMapper._();
+
+  /// Maps a [InHouseGame] configuration into an [InHouseGameBlock].
+  static GameBlock fromInHouseConfig(InHouseGame config) {
+    return GameBlock.inHouse(
+      providerId: config.providerId,
+      providerName: config.providerName,
+      productId: config.productId,
+      gameCode: config.gameCode,
+      gameName: config.gameName,
+      lang: config.lang,
+      gameType: config.gameType,
+      image: config.image,
+      enableHostMessage: config.enableHostMessage,
+      mobileOrientation: config.mobileOrientation.isEmpty
+          ? GameOrientation.landscape
+          : config.mobileOrientation,
+      tabletOrientation: config.tabletOrientation.isEmpty
+          ? GameOrientation.landscape
+          : config.tabletOrientation,
+      desktopOrientation: config.desktopOrientation.isEmpty
+          ? GameOrientation.all
+          : config.desktopOrientation,
+    );
+  }
+
+  /// Maps a raw [gac.Game] DTO into a [GameBlock].
+  static GameBlock fromGame({
+    required gac.Game game,
+    required String providerId,
+    required String providerName,
+    required String image,
+    ExternalProviderSettings? externalSettings,
+    bool enableHostMessage = false,
+    List<GameOrientation>? mobileOrientation,
+    List<GameOrientation>? tabletOrientation,
+    List<GameOrientation>? desktopOrientation,
+    bool? forceLandscapeViewportOnIpad,
+    bool? openInNewTab,
+    bool isInHouseGame = false,
+  }) {
+    // 1. Resolve hybrid provider-specific configuration overrides (Remote > Local Fallback)
+    final providerConfig = externalSettings?.getConfigForProvider(providerId);
+
+    // 2. Map fields, prioritizing: Explicit Argument > Hybrid Provider Config > Package/API default
+    final resolvedGameType =
+        providerConfig?.gameType ??
+        GameTypeMapper.fromPackageGameType(game.gameType);
+
+    final resolvedMobileOrientation =
+        mobileOrientation ??
+        providerConfig?.mobileOrientation ??
+        GameOrientation.all;
+
+    final resolvedTabletOrientation =
+        tabletOrientation ??
+        providerConfig?.tabletOrientation ??
+        GameOrientation.all;
+
+    final resolvedDesktopOrientation =
+        desktopOrientation ??
+        providerConfig?.desktopOrientation ??
+        GameOrientation.all;
+
+    final resolvedForceLandscape =
+        forceLandscapeViewportOnIpad ??
+        providerConfig?.forceLandscapeViewportOnIpad ??
+        false;
+
+    final resolvedOpenInNewTab =
+        openInNewTab ?? providerConfig?.openInNewTabOnIOSSafariWeb ?? false;
+
+    final resolvedSessionGuard = providerConfig?.requiresSessionGuard ?? false;
+
+    final resolvedDebounce = Duration(
+      milliseconds: providerConfig?.loadStopDebounceMs ?? 0,
+    );
+
+    // 3. Create the appropriate subclass
+    if (isInHouseGame) {
+      return GameBlock.inHouse(
+        productId: game.productId,
+        gameCode: game.gameCode,
+        gameName: game.gameName,
+        lang: game.lang,
+        providerId: providerId,
+        providerName: providerName,
+        image: image,
+        gameType: resolvedGameType,
+        mobileOrientation: resolvedMobileOrientation,
+        tabletOrientation: resolvedTabletOrientation,
+        desktopOrientation: resolvedDesktopOrientation,
+        enableHostMessage: enableHostMessage,
+        loadStopDebounce: resolvedDebounce.inMilliseconds > 0
+            ? resolvedDebounce
+            : null,
+      );
+    }
+
+    return GameBlock.liveStream(
+      productId: game.productId,
+      gameCode: game.gameCode,
+      gameName: game.gameName,
+      lang: game.lang,
+      lobbyUrl: game.lobbyUrl,
+      cashierUrl: game.cashierUrl,
+      mobileLogin: game.mobileLogin,
+      providerId: providerId,
+      providerName: providerName,
+      image: image,
+      gameType: resolvedGameType,
+      mobileOrientation: resolvedMobileOrientation,
+      tabletOrientation: resolvedTabletOrientation,
+      desktopOrientation: resolvedDesktopOrientation,
+      forceLandscapeViewportOnIpad: resolvedForceLandscape,
+      openInNewTabOnIOSSafariWeb: resolvedOpenInNewTab,
+      requiresSessionGuard: resolvedSessionGuard,
+      loadStopDebounce: resolvedDebounce.inMilliseconds > 0
+          ? resolvedDebounce
+          : null,
+    );
+  }
+}

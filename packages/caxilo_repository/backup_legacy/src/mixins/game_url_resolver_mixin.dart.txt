@@ -1,0 +1,60 @@
+import 'package:flutter/foundation.dart';
+import 'package:game_api_client/game_api_client.dart' as gac;
+import 'package:casino_settings/casino_settings.dart';
+
+import '../game_failure.dart';
+
+/// Mixin responsible for resolving game launch URLs.
+mixin GameUrlResolverMixin {
+  /// Remote API client for fetching URLs.
+  gac.GameApiClient get gameApiClient;
+
+  /// In-house settings client for checking local games.
+  CasinoSettingsClient get settingsClient;
+
+  /// Returns a launch URL for the specified game.
+  ///
+  /// This method distinguishes between:
+  /// 1. **In-house Games**: Handled via [settingsClient] (e.g., Sunwin).
+  /// 2. **Remote Provider Games**: Handled via API call to [gameApiClient].
+  ///
+  /// Errors:
+  /// - Throws [GameMaintenanceFailure] if an in-house game is under development.
+  /// - Throws [GetGameUrlFailure] if the request fails or any unexpected
+  ///   error occurs.
+  Future<String> getGameUrl({
+    required String providerId,
+    required String productId,
+    required String gameCode,
+    String? lang,
+    bool? isMobileLogin,
+  }) async {
+    try {
+      if (settingsClient.isInHouseGame(providerId)) {
+        final localUrl = await settingsClient.getGameUrl(
+          gameCode: gameCode,
+          isWeb: kIsWeb,
+        );
+        debugPrint('Local Game URL: $localUrl');
+        return localUrl;
+      }
+
+      return await gameApiClient.getGameUrl(
+        gac.GetGameUrlRequest(
+          providerId: providerId,
+          productId: productId,
+          gameCode: gameCode,
+          lang: lang,
+          isMobileLogin: isMobileLogin,
+        ),
+      );
+    } on InHouseGameUrlFetchException catch (error, stackTrace) {
+      Error.throwWithStackTrace(GetGameUrlFailure(error), stackTrace);
+    } on InHouseGameUnderDevelopmentException catch (error, stackTrace) {
+      debugPrint('⚠️ GameRepository: Game is under maintenance: $gameCode');
+      Error.throwWithStackTrace(GameMaintenanceFailure(error), stackTrace);
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(GetGameUrlFailure(error), stackTrace);
+    }
+  }
+}

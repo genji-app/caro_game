@@ -1,0 +1,172 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:casino_settings/casino_settings.dart';
+
+part 'game_block.freezed.dart';
+part 'game_block.g.dart';
+
+/// {@template game_block}
+/// A flattened representation of a game with its provider context.
+///
+/// This model combines [Game] data with its parent provider information,
+/// facilitating linear list display and filtering without nested properties.
+/// {@endtemplate}
+@freezed
+sealed class GameBlock with _$GameBlock {
+  const factory GameBlock.liveStream({
+    // --- provider data & resolved image ---
+    /// The unique id of the provider (e.g. `amb-vn`, `vivo`, `sunwin`)
+    required String providerId,
+
+    /// The human-readable name of the provider.
+    required String providerName,
+
+    /// The resolved image path or name for the game thumbnail.
+    required String image,
+
+    // --- core game data ---
+
+    /// The specific product API identifier (e.g., 'SEXY', 'EVO').
+    required String productId,
+
+    /// The specific unique code for this game within the provider.
+    required String gameCode,
+
+    /// The human-readable name of the game.
+    required String gameName,
+
+    /// The required language code for the game url.
+    required String lang,
+
+    /// The generic category of this game (e.g. slot, live, sport).
+    @JsonKey(fromJson: GameType.fromJson, toJson: GameType.staticToJson)
+    required GameType gameType,
+
+    // --- live stream specific ---
+
+    /// The lobby URL for this live stream game (used to return to the provider's lobby).
+    required String lobbyUrl,
+
+    /// The cashier URL for this live stream game (used if player needs to deposit).
+    required String cashierUrl,
+
+    /// Whether this game requires setting a mobile specific flag in its URL.
+    @Default(false) bool mobileLogin,
+
+    /// Allowed orientations on mobile phones.
+    @GameOrientationListConverter()
+    @Default(GameOrientation.portrait)
+    List<GameOrientation> mobileOrientation,
+
+    /// Allowed orientations on tablets.
+    @GameOrientationListConverter()
+    @Default(GameOrientation.landscape)
+    List<GameOrientation> tabletOrientation,
+
+    /// Allowed orientations on desktops.
+    @GameOrientationListConverter()
+    @Default(GameOrientation.all)
+    List<GameOrientation> desktopOrientation,
+
+    /// Specialized debounce for [onLoadStop] event to wait for final JS/DOM states.
+    Duration? loadStopDebounce,
+
+    /// Determines the order in which this game is displayed relative to others.
+    @Default(999) int sortOrder,
+
+    /// Whether this game should forcefully render in an immersive landscape virtual viewport on iPad.
+    @Default(false) bool forceLandscapeViewportOnIpad,
+
+    /// Determines whether this game should be opened in a new tab to avoid crashes.
+    @Default(false) bool openInNewTabOnIOSSafariWeb,
+
+    /// Whether this game requires a session cooldown guard before launching.
+    @Default(false) bool requiresSessionGuard,
+  }) = LiveStreamGameBlock;
+
+  const factory GameBlock.inHouse({
+    // --- provider data & resolved image ---
+    /// The unique id of the provider (e.g. `amb-vn`, `vivo`, `sunwin`)
+    required String providerId,
+
+    /// The human-readable name of the provider.
+    required String providerName,
+
+    /// The resolved image path or name for the game thumbnail.
+    required String image,
+
+    // --- core game data ---
+
+    /// The specific product API identifier (e.g., 'SEXY', 'EVO').
+    required String productId,
+
+    /// The specific unique code for this game within the provider.
+    required String gameCode,
+
+    /// The human-readable name of the game.
+    required String gameName,
+
+    /// The required language code for the game url.
+    required String lang,
+
+    /// The generic category of this game (e.g. slot, live, sport).
+    @JsonKey(fromJson: GameType.fromJson, toJson: GameType.staticToJson)
+    required GameType gameType,
+
+    /// Allowed orientations on mobile phones.
+    @GameOrientationListConverter()
+    @Default(GameOrientation.portrait)
+    List<GameOrientation> mobileOrientation,
+
+    /// Allowed orientations on tablets.
+    @GameOrientationListConverter()
+    @Default(GameOrientation.all)
+    List<GameOrientation> tabletOrientation,
+
+    /// Allowed orientations on desktops.
+    @GameOrientationListConverter()
+    @Default(GameOrientation.all)
+    List<GameOrientation> desktopOrientation,
+
+    /// Specialized debounce for [onLoadStop] event to wait for final JS/DOM states.
+    Duration? loadStopDebounce,
+
+    /// Determines the order in which this game is displayed relative to others.
+    @Default(999) int sortOrder,
+
+    // --- in-house specific ---
+
+    /// Whether this game enables host message channel.
+    @Default(false) bool enableHostMessage,
+  }) = InHouseGameBlock;
+
+  factory GameBlock.fromJson(Map<String, dynamic> json) =>
+      _$GameBlockFromJson(json);
+}
+
+/// Extension to provide handy getters and state checks for [GameBlock].
+extension GameBlockX on GameBlock {
+  /// Whether this game was developed in-house (e.g. Sunwin).
+  bool get isInHouseGame => this is InHouseGameBlock;
+
+  /// Whether this is a remote live stream game.
+  bool get isLiveStreamGame => this is LiveStreamGameBlock;
+
+  /// Flag to force landscape rendering on iPads.
+  bool get forceLandscapeViewportOnIpad =>
+      this is LiveStreamGameBlock &&
+      (this as LiveStreamGameBlock).forceLandscapeViewportOnIpad;
+
+  /// Flag to open the game in a new browser tab on iOS Safari.
+  bool get openInNewTabOnIOSSafariWeb =>
+      this is LiveStreamGameBlock &&
+      (this as LiveStreamGameBlock).openInNewTabOnIOSSafariWeb;
+
+  /// Flag to enforce a session guard before launching the game.
+  bool get requiresSessionGuard =>
+      this is LiveStreamGameBlock &&
+      (this as LiveStreamGameBlock).requiresSessionGuard;
+
+  /// Flag to enable host message communication (mostly for in-house).
+  bool get enableHostMessage =>
+      this is InHouseGameBlock && (this as InHouseGameBlock).enableHostMessage;
+}

@@ -1,0 +1,23 @@
+/// Game Repository
+///
+/// A repository layer for managing game data with in-memory caching,
+/// search, and error handling.
+library;
+
+export 'package:game_api_client/game_api_client.dart' show ProviderGames;
+export 'package:casino_settings/casino_settings.dart';
+
+export 'src/game_failure.dart';
+export 'src/game_mapper.dart';
+export 'src/game_repository.dart';
+export 'src/game_storage.dart';
+export 'src/game_utils.dart';
+export 'src/models/models.dart';
+
+// Export mixins so that inherited methods are visible when importing the repository
+export 'src/mixins/game_category_mixin.dart';
+export 'src/mixins/game_lobby_mixin.dart';
+export 'src/mixins/game_data_processor_mixin.dart';
+export 'src/mixins/game_search_engine_mixin.dart';
+export 'src/mixins/game_url_resolver_mixin.dart';
+export 'src/mixins/game_notification_mixin.dart';
