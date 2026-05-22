@@ -1,0 +1,276 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:game_api_client/game_api_client.dart' as gac;
+import 'package:casino_settings/casino_settings.dart';
+
+import 'game_failure.dart';
+import 'game_storage.dart';
+import 'game_utils.dart';
+import 'models/models.dart';
+
+import 'mixins/game_url_resolver_mixin.dart';
+import 'mixins/game_search_engine_mixin.dart';
+import 'mixins/game_data_processor_mixin.dart';
+import 'mixins/game_category_mixin.dart';
+import 'mixins/game_lobby_mixin.dart';
+import 'mixins/game_notification_mixin.dart';
+
+/// {@template game_repository}
+/// A repository that manages game data with in-memory caching and reactive updates.
+///
+/// This repository acts as a bridge between remote game APIs and local in-house
+/// configuration. It features:
+/// - **Automatic Synchronization**: Listens to [CasinoSettingsClient] and
+///   automatically refreshes the game cache when remote settings change.
+/// - **Dynamic Categorization**: Generates UI categories on-the-fly based on
+///   polymorphic configurations from the remote settings.
+/// - **Unified Sorting**: Ensures all games (both remote and in-house) are
+///   sorted according to the display priority defined in the settings.
+/// - **Hybrid Whitelist Filtering**: Only includes games confirmed by the
+///   whitelist (Remote Config > Local Fallback) defined in [CasinoSettingsClient].
+///
+/// On [warmup], local games are seeded into cache immediately, then remote data
+/// is fetched and merged. When any data refresh completes, a [GameDataChanged]
+/// event is emitted on [events].
+/// {@endtemplate}
+class GameRepository
+    with
+        GameDataProcessorMixin,
+        GameCategoryMixin,
+        GameSearchEngineMixin,
+        GameUrlResolverMixin,
+        GameLobbyMixin,
+        GameNotificationMixin {
+  /// {@macro game_repository}
+  GameRepository({
+    required gac.GameApiClient client,
+    required CasinoSettingsClient settingsClient,
+    GameStorage? storage,
+    GameUtils? utils,
+  }) : _client = client,
+       _settingsClient = settingsClient,
+       _storage = storage ?? InMemoryGameStorage(ttl: const Duration(hours: 1)),
+       _utils = utils ?? GameUtils() {
+    _initSettingsListener();
+  }
+
+  final gac.GameApiClient _client;
+  final CasinoSettingsClient _settingsClient;
+  final GameStorage _storage;
+  final GameUtils _utils;
+
+  // --- Mixin dependencies implementation ---
+  @override
+  gac.GameApiClient get gameApiClient => _client;
+
+  @override
+  CasinoSettingsClient get settingsClient => _settingsClient;
+
+  @override
+  GameUtils get utils => _utils;
+
+  @override
+  String get defaultProviderId => sunwinProviderId;
+
+  /// Subscription to settings changes.
+  StreamSubscription<CasinoSettingsStatus>? _settingsSubscription;
+
+  /// Future representing an ongoing API fetch to prevent redundant
+  /// concurrent requests.
+  Future<List<GameBlock>>? _activeFetchFuture;
+
+  // ---------------------------------------------------------------------------
+  // Constants
+  // ---------------------------------------------------------------------------
+
+  /// Sunwin provider ID — single source of truth.
+  static const String sunwinProviderId = CasinoSettingsClient.sunwinProviderId;
+
+  /// Sunwin provider display name.
+  static const String sunwinProviderName =
+      CasinoSettingsClient.sunwinProviderName;
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  /// Pre-loads the game cache for instant access.
+  ///
+  /// 1. Seeds local Sunwin games into cache (sync, instant).
+  /// 2. Fetches the full game list from API and merges with local data.
+  ///
+  /// Call once at app init (after login). If never called, [getGames]
+  /// will still work — it triggers a fetch internally as a fallback.
+  ///
+  /// Throws [GetGamesFailure] if the network request fails.
+  Future<void> warmup({String? settingsUrl}) async {
+    // 1. Sync settings in background (non-blocking for UI rendering if fallback exists)
+    // Nếu có settingsUrl mới thì fetch, nếu không thì dùng sync() mặc định của client
+    if (settingsUrl != null) {
+      unawaited(syncSettings(url: settingsUrl));
+    } else {
+      unawaited(syncSettings());
+    }
+
+    // 2. Seed local games into cache immediately
+    await _seedLocalGames();
+
+    // 3. Fetch remote games and merge
+    await _fetchGames(forceRefresh: true);
+  }
+
+  /// Synchronizes the casino configuration with the remote server.
+  ///
+  /// This updates the [CasinoSettingsClient] state, which in turn
+  /// triggers a game list refresh via the listener.
+  Future<void> syncSettings({String? url}) async {
+    try {
+      if (url != null) {
+        debugPrint(
+          '📡 GameRepository: Syncing settings from explicit URL: $url...',
+        );
+        await _settingsClient.fetchSettings(url);
+      } else {
+        debugPrint(
+          '📡 GameRepository: Syncing settings using initial injected URL...',
+        );
+        await _settingsClient.sync();
+      }
+    } catch (e) {
+      debugPrint(
+        '⚠️ GameRepository: Settings sync failed, using fallback/cache: $e',
+      );
+      // We don't rethrow here to allow the app to work with fallback data
+    }
+  }
+
+  /// Returns games matching the given [query] and/or [filter].
+  ///
+  /// Searches through cached games by game name, provider name,
+  /// and game code (all case-insensitive). If no arguments are provided,
+  /// returns **all** cached games.
+  ///
+  /// Throws [GetGamesFailure] if the underlying API call fails or if the
+  /// merged game list cannot be processed.
+  @override
+  Future<List<GameBlock>> getGames({String? query, GameFilter? filter}) async {
+    final games = await _fetchGames();
+
+    var result = applySearchAndFilter(games, query: query, filter: filter);
+
+    // If the cached result is empty but there's an active fetch (e.g., during warmup),
+    // wait for it to complete to capture the fresh data.
+    if (result.isEmpty && _activeFetchFuture != null) {
+      debugPrint(
+        '🔄 GameRepository: Empty cached result, waiting for active fetch...',
+      );
+      final freshGames = await _activeFetchFuture!;
+      result = applySearchAndFilter(freshGames, query: query, filter: filter);
+    }
+
+    return result;
+  }
+
+  /// Returns the top [limit] popular games.
+  ///
+  /// Priority order:
+  /// 1. Games explicitly listed in the 'featured' section of remote settings.
+  /// 2. If 'featured' is empty, falls back to the first [limit] in-house games.
+  Future<List<GameBlock>> getPopularGames({int limit = 5}) async {
+    final allGames = await _fetchGames();
+    return getPopularGamesFromList(allGames, limit: limit);
+  }
+
+  /// Clears the in-memory cache.
+  ///
+  /// Call on logout or when data might be stale.
+  void clearStorage() => _storage.clear();
+
+  /// Disposes the event stream controller.
+  ///
+  /// Call on app shutdown or when this repository is no longer needed.
+  void dispose() {
+    _settingsSubscription?.cancel();
+    disposeNotifications();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal — cache & fetch
+  // ---------------------------------------------------------------------------
+
+  /// Sets up a listener for remote settings updates.
+  ///
+  /// When settings are successfully re-loaded (v2), we force a re-fetch
+  /// of the merged game list to ensure local games and visibility are current.
+  void _initSettingsListener() {
+    _settingsSubscription = _settingsClient.onStatusChanged.listen((status) {
+      if (status is CasinoSettingsStatusLoaded) {
+        debugPrint('🔔 GameRepository: Settings updated, refreshing cache...');
+        _fetchGames(forceRefresh: true).catchError((Object e) {
+          debugPrint(
+            '❌ GameRepository: Failed to refresh after settings change: $e',
+          );
+          return <GameBlock>[];
+        });
+      }
+    });
+  }
+
+  /// Seeds local games into the cache when it is empty,
+  /// so the UI has data to display immediately.
+  Future<void> _seedLocalGames() async {
+    if (_storage.get() != null) return;
+    final localGames = await getInHouseGameBlocks();
+    if (localGames.isNotEmpty) {
+      _storage.set(localGames);
+      debugPrint('🌞 GameRepository: Seeded ${localGames.length} local games');
+    }
+  }
+
+  /// Returns the cached games list, or fetches from the API if needed.
+  ///
+  /// Concurrent callers share the same in-flight future.
+  /// Pass [forceRefresh] to bypass cache.
+  Future<List<GameBlock>> _fetchGames({bool forceRefresh = false}) async {
+    if (!forceRefresh) {
+      final cached = _storage.get();
+      if (cached != null) return cached;
+    }
+
+    if (_activeFetchFuture != null) {
+      debugPrint('🔄 GameRepository: Joined existing active fetch');
+      return _activeFetchFuture!;
+    }
+
+    _activeFetchFuture = _fetchAndProcessGames();
+    try {
+      return await _activeFetchFuture!;
+    } finally {
+      _activeFetchFuture = null;
+    }
+  }
+
+  /// Fetches from API, filters via hybrid whitelist, merges local games,
+  /// and updates the cache.
+  Future<List<GameBlock>> _fetchAndProcessGames() async {
+    try {
+      debugPrint('📡 GameRepository: Fetching games from API...');
+      final raw = await _client.getGames();
+      final processedRemote = processRawGames(raw);
+
+      final localGames = await getInHouseGameBlocks();
+
+      final mergedAndSorted = mergeAndSortGames(
+        processedRemoteGames: processedRemote,
+        localGames: localGames,
+      );
+
+      _storage.set(mergedAndSorted);
+      emitEvent(GameDataChanged(mergedAndSorted));
+      return mergedAndSorted;
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(GetGamesFailure(error), stackTrace);
+    }
+  }
+}

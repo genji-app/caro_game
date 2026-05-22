@@ -1,0 +1,127 @@
+import 'package:flutter/foundation.dart';
+import 'package:game_api_client/game_api_client.dart' as gac;
+import 'package:casino_settings/casino_settings.dart';
+
+import '../game_mapper.dart';
+import '../game_utils.dart';
+import '../models/models.dart';
+
+/// Mixin responsible for processing raw game data from APIs and merging with in-house games.
+mixin GameDataProcessorMixin {
+  /// Settings client for accessing in-house game list and display order.
+  CasinoSettingsClient get settingsClient;
+
+  /// Utility for generating image names.
+  GameUtils get utils;
+
+  /// Retrieves in-house games and converts them to [GameBlock] models.
+  Future<List<GameBlock>> getInHouseGameBlocks() async {
+    final localConfigs = await settingsClient.getAllInHouseGames();
+    return localConfigs
+        .map((c) => GameBlockMapper.fromInHouseConfig(c))
+        .toList();
+  }
+
+  /// Maps raw [ProviderGames] into a flat, filtered list.
+  ///
+  /// Uses the hybrid whitelist from [CasinoSettingsClient] (Remote > Local Fallback).
+  List<GameBlock> processRawGames(List<gac.ProviderGames> allGames) {
+    final result = <GameBlock>[];
+    var total = 0;
+
+    final externalSettings = settingsClient.config?.external;
+
+    for (final provider in allGames) {
+      total += provider.gameList.length;
+      for (final game in provider.gameList) {
+        // Use the hybrid isSupported logic now encapsulated in the package.
+        final isSupported =
+            externalSettings?.isSupported(provider.providerId, game.gameCode) ??
+            false;
+
+        if (isSupported) {
+          result.add(
+            GameBlockMapper.fromGame(
+              game: game,
+              providerId: provider.providerId,
+              providerName: provider.providerName,
+              externalSettings: externalSettings,
+              image:
+                  externalSettings?.getGameImage(
+                    provider.providerId,
+                    game.gameCode,
+                  ) ??
+                  utils.generateImageName(
+                    providerId: provider.providerId,
+                    gameCode: game.gameCode,
+                    gameName: game.gameName,
+                  ),
+            ),
+          );
+        }
+      }
+    }
+
+    debugPrint(
+      '📊 Games: $total total → ${result.length} after hybrid whitelist',
+    );
+    return result;
+  }
+
+  /// Merges remote and local games, then sorts them based on remote settings.
+  List<GameBlock> mergeAndSortGames({
+    required List<GameBlock> processedRemoteGames,
+    required List<GameBlock> localGames,
+  }) {
+    final filtered = List<GameBlock>.from(processedRemoteGames);
+    filtered.addAll(localGames);
+    debugPrint('📊 Added ${localGames.length} local games');
+
+    // Sort entire list based on priority groups and remote settings display order
+    final displayOrder = settingsClient.config?.display.order ?? [];
+
+    filtered.sort((a, b) {
+      final indexA = displayOrder.indexOf(a.gameCode);
+      final indexB = displayOrder.indexOf(b.gameCode);
+
+      // Priority Groups:
+      // Group 0: In-house games present in displayOrder
+      // Group 1: In-house games NOT present in displayOrder
+      // Group 2: Remote games present in displayOrder
+      // Group 3: Remote games NOT present in displayOrder
+      final weightA = a.isInHouseGame
+          ? (indexA != -1 ? 0 : 1)
+          : (indexA != -1 ? 2 : 3);
+
+      final weightB = b.isInHouseGame
+          ? (indexB != -1 ? 0 : 1)
+          : (indexB != -1 ? 2 : 3);
+
+      if (weightA != weightB) {
+        return weightA.compareTo(weightB);
+      }
+
+      // If in the same priority group:
+      if (indexA != -1 && indexB != -1) {
+        // Both in displayOrder: follow the specified order
+        return indexA.compareTo(indexB);
+      }
+
+      // If not in displayOrder or same level:
+      // For Remote games (Groups 2 or 3), sub-sort by provider first
+      if (!a.isInHouseGame) {
+        final providerComp = a.providerName.compareTo(b.providerName);
+        if (providerComp != 0) return providerComp;
+      }
+
+      // Final fallback: sort by game name
+      return a.gameName.compareTo(b.gameName);
+    });
+
+    debugPrint(
+      '⚖️ GameRepository: Sorted games (In-house > Remote, sub-sorted by provider)',
+    );
+
+    return filtered;
+  }
+}

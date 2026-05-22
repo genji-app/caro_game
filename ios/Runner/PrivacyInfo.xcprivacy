@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- App does not track users across apps/websites. -->
+  <key>NSPrivacyTracking</key>
+  <false/>
+
+  <!-- No tracking domains. -->
+  <key>NSPrivacyTrackingDomains</key>
+  <array/>
+
+  <!-- App does not collect any user data. Update this list if you ever add
+       analytics, crash reporting with PII, auth, etc. -->
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array/>
+
+  <!-- Required Reason APIs used by this app / its plugins.
+       Plugins (shared_preferences, path_provider, package_info_plus,
+       device_info_plus, etc.) ship their own PrivacyInfo.xcprivacy under
+       their iOS pod; the entries below cover additional app-level reasons
+       so the merged manifest in the IPA is complete. -->
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+    <!-- UserDefaults: shared_preferences uses NSUserDefaults for app prefs.
+         CA92.1 = "Access info from same app, per documentation". -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>CA92.1</string>
+      </array>
+    </dict>
+
+    <!-- File timestamp: path_provider / Flutter asset loading may query
+         file timestamps (creationDate, modificationDate).
+         C617.1 = "Inside app container / app group container". -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>C617.1</string>
+      </array>
+    </dict>
+
+    <!-- System boot time: Flutter engine / audioplayers / crash reporters
+         often call mach_absolute_time() for monotonic timing.
+         35F9.1 = "Measure time elapsed between events within the app". -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>35F9.1</string>
+      </array>
+    </dict>
+
+    <!-- Disk space: some plugins (audio cache, path_provider) query free
+         disk space before writing.
+         E174.1 = "Write/save to disk for app functionality". -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>E174.1</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

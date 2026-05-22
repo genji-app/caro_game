@@ -1,4 +1,5 @@
 {
+    "dart.flutterSdkPath": "/Users/admin/fvm/versions/3.41.6",
     "terminal.integrated.env.osx": {
         "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:${env:PATH}"
     }

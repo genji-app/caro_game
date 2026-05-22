@@ -1,0 +1,61 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gap/gap.dart';
+import 'package:sun_sports/core/services/storage/sport_storage.dart';
+import 'package:sun_sports/features/game/game.dart';
+import 'package:sun_sports/features/home/presentation/desktop/widgets/home_desktop_banner_section.dart';
+import 'package:sun_sports/features/home/presentation/desktop/widgets/home_desktop_casino_section.dart';
+import 'package:sun_sports/features/home/presentation/desktop/widgets/home_desktop_hot_bets_section.dart';
+import 'package:sun_sports/features/home/presentation/desktop/widgets/home_desktop_ncc_section.dart';
+import 'package:sun_sports/features/home/presentation/desktop/widgets/home_desktop_sports_section.dart';
+import 'package:sun_sports/features/home/presentation/mobile/widgets/home_mobile_welcome_section.dart';
+import 'package:sun_sports/features/home/presentation/widgets/count_down_event/count_down_event_screen.dart';
+
+class HomeDesktopScreen extends ConsumerStatefulWidget {
+  const HomeDesktopScreen({super.key});
+
+  @override
+  ConsumerState<HomeDesktopScreen> createState() => _HomeDesktopScreenState();
+}
+
+class _HomeDesktopScreenState extends ConsumerState<HomeDesktopScreen> {
+  @override
+  void initState() {
+    super.initState();
+    SportStorage.instance.init();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF141414),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            HomeMobileWelcomeSection(),
+            Gap(12),
+            CountDownEventScreen(),
+            Gap(12),
+            HomeDesktopHotBetsSection(),
+            Gap(12),
+            HomeDesktopSportsSection(),
+            Gap(12),
+            //NCC sportbook
+            HomeDesktopNccSection(),
+            Gap(12),
+            RepaintBoundary(child: GameGroupView.featured()),
+            HomeDesktopCasinoSection(),
+            Gap(12),
+            // LiveBetView(),
+            // Gap(12),
+            HomeDesktopBannerSection(),
+            Gap(12),
+            RepaintBoundary(child: GameGroupView.liveCasino()),
+          ],
+        ),
+      ),
+    );
+  }
+}

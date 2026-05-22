@@ -1,0 +1,26 @@
+---
+description: Widgets, responsiveness, and visual consistency for sun_sports presentation code
+globs: lib/features/**/presentation/**/*.dart,lib/shared/widgets/**/*.dart
+alwaysApply: false
+---
+
+# Sun Sports — presentation and widgets
+
+## Structure
+
+- Prefer smaller widgets over deep trees; use **`const`** constructors when dependencies allow
+- Platform splits: reuse **`ResponsiveBuilder`** rather than ad-hoc width checks unless the file already documents a specific constraint (e.g. `MediaQuery` + `Breakpoints.mobile`)
+
+## Theming and assets
+
+- Colors/typography: **`AppColorStyles`**, **`AppTextStyles`**, spacing/radius in **`core/utils/styles/`**
+- Images/icons: existing helpers (**`ImageHelper`**, **`AppImages`**, Rive/Lottie where already used)—match surrounding imports
+
+## Performance gotchas
+
+- Avoid **`SliverFillRemaining` + `LayoutBuilder`** patterns that trigger intrinsic height issues; follow existing comments in sport mobile screens when adding slivers
+- Lists/grids: prefer patterns already used in the feature (shimmer, pagination notifiers from `core/pagination/`)
+
+## Networking and live data
+
+- Sport odds and bet slip state: respect **websocket**-driven providers; do not bypass **`WebSocketManager`** / subscription patterns when updating bet cards or event lists

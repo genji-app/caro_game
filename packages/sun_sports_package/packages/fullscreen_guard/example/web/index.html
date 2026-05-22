@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="example">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png" />
+
+  <title>example</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* Font loading optimization with font-display: swap */
+    /* Inter font (~400KB/file) - Much lighter than SF Pro Display (4MB/file)! */
+    body {
+      /* height: 500vh !important; */
+      /* Bigger than 100% to allow scroll */
+      position: static !important;
+      /* Override absolute from flutter */
+      overflow-y: scroll !important;
+      /* Allows verticall scrolling */
+      overflow-x: hidden !important;
+      touch-action: pan-y !important;
+      /* Allows vertical scrolling */
+      overscroll-behavior: none;
+      /* Avoid bouncing scrolling on top/bottom edget */
+    }
+
+    /* Flutter canvas: switch from `position:absolute` to `position:fixed`
+       so the canvas doesn't scroll with the body (body is made scrollable for
+       the iOS Safari Minimal-UI trick). The canvas should always fill the
+       current visual viewport.
+       
+       NOTE: height is intentionally NOT set here. The Dart-side
+       platform_ui_controller_web will set flt-glass-pane height to
+       100lvh (in px, with !important) when entering immersive mode.
+       Leaving height unset here prevents CSS from breaking Flutter's layout in normal mode. */
+    flt-glass-pane {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+    }
+
+    /* 
+    Scrollbar hide doesn't work on iOS, they add a default one when overflow:true and  -webkit-overflow-scrolling: touch; 
+    Sadly since iOS 13, this value is forced on iOS -> https://developer.apple.com/documentation/safari-release-notes/safari-13-release-notes
+    */
+    ::-webkit-scrollbar {
+      display: false;
+      width: 0px;
+      height: 0px;
+      /* Remove scrollbar space */
+      background: transparent;
+      /* Optional: just make scrollbar invisible */
+    }
+  </style>
+</head>
+
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+
+</html>

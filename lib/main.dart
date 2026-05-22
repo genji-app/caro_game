@@ -1,23 +1,32 @@
-import 'package:co_caro_flame/s88/core/services/auth/sb_login.dart';
-import 'package:co_caro_flame/s88/core/services/storage/sport_storage.dart';
-import 'package:co_caro_flame/s88/core/services/system_ui/system_ui_provider.dart';
-import 'package:co_caro_flame/s88/core/services/system_ui/system_ui_service.dart';
-import 'package:co_caro_flame/s88/shared/widgets/splash/splash_screen.dart';
+import 'dart:async';
+
+import 'package:co_caro_flame/core/restart_scope.dart';
+import 'package:co_caro_flame/screens/default_splash_screen.dart';
+import 'package:co_caro_flame/screens/splash_screen.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rive/rive.dart' as rive;
-import 'package:unlock_shorebird_kit/unlock_shorebird_kit.dart';
+import 'package:sun_sports/app.dart';
+import 'package:sun_sports/sun_sports_init.dart';
+import 'package:terminate_restart/terminate_restart.dart';
+import 'package:unlock_shorebird_kit/screens/splash_mode_screen.dart';
 import 'core/app_settings.dart';
 import 'core/audio_service.dart';
-import 'core/restart_scope.dart';
 import 'core/text_app_style.dart';
-import 'screens/default_splash_screen.dart';
-import 'screens/fake_mode_screen.dart';
-import 'screens/splash_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+ThemeData buildAppTheme() {
+  return ThemeData(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: const Color(0xFF4fc3f7),
+      brightness: Brightness.dark,
+    ),
+    useMaterial3: true,
+    scaffoldBackgroundColor: const Color(0xFF070714),
+  );
+}
+
+Future<void> _bootstrap() async {
   await AppSettings().load();
   await AudioService().init();
   TextAppStyle.precacheMultilingualFonts();
@@ -28,29 +37,62 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
+}
+
+void main() async {
+  // QUAN TRỌNG: ensureInitialized() PHẢI chạy ĐẦU TIÊN, trước bất kỳ API nào
+  // dùng ServicesBinding (SystemChrome, HapticFeedback, SharedPreferences...).
+  // Không được gọi SystemChrome trước dòng này — sẽ crash
+  // "ServicesBinding has not yet been initialized".
   WidgetsFlutterBinding.ensureInitialized();
 
-  final systemUi = SystemUiService();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // QUAN TRỌNG: Initialize TerminateRestart TRƯỚC khi runApp. Nếu không,
+  // restartApp(terminate: true) sẽ fail silently trên iOS → fallback widget
+  // remount → Shorebird patch không apply → infinite loop.
+  //
+  // Cấu hình đi kèm (bắt buộc):
+  // - ios/Runner/Info.plist phải có CFBundleURLTypes với URL scheme =
+  //   $(PRODUCT_BUNDLE_IDENTIFIER) để iOS reopen app sau khi plugin exit().
+  TerminateRestart.instance.initialize();
 
-  // Set system UI overlay style early to prevent white screen flash
-  systemUi.setSplashSystemUIOverlayStyle();
-
-  await rive.RiveNative.init();
-
-  // Initialize SportStorage before app runs so sync methods work
-  await SportStorage.instance.init();
-
-  // Load brand config trước runApp() để SplashScreen có cdnImages ngay từ frame đầu tiên.
-  await SbLogin.loadBrandConfigOnly().catchError((_) {});
+  await _bootstrap();
+  final overrides = await SunSports.init();
   runApp(
+    // khi build patch thì dùng code dưới này
     ProviderScope(
-      overrides: [systemUiProvider.overrideWithValue(systemUi)],
-      child: const CaroApp(),
+      overrides: overrides,
+      child: RestartScope(
+        child: MaterialApp(
+          title: 'Cờ Caro',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          home: SplashModeScreen(
+            bettingScreenBuilder: () => const App(),
+            fakeScreenBuilder: () => const CaroApp(),
+            executeRestartWithFade: RestartScope.executeRestartApp,
+            splashScreenBuilder: () => const DefaultSplashScreen(),
+          ),
+        ),
+      ),
     ),
+    // khi build release thì dùng code dưới này
+    // RestartScope(
+    //   child: MaterialApp(
+    //     title: 'Cờ Caro',
+    //     debugShowCheckedModeBanner: false,
+    //     theme: buildAppTheme(),
+    //     home: SplashModeScreen(
+    //       bettingScreenBuilder: () => const CaroApp(),
+    //       fakeScreenBuilder: () => const CaroApp(),
+    //       executeRestartWithFade: RestartScope.executeRestartApp,
+    //       splashScreenBuilder: () => const DefaultSplashScreen(),
+    //     ),
+    //   ),
+    // ),
   );
 }
 
+/// Game shell after unlock flow; uses the root [MaterialApp] from [main].
 class CaroApp extends StatefulWidget {
   const CaroApp({super.key});
 
@@ -58,46 +100,24 @@ class CaroApp extends StatefulWidget {
   State<CaroApp> createState() => _CaroAppState();
 }
 
-class _CaroAppState extends State<CaroApp> with SingleTickerProviderStateMixin {
-  late AnimationController _fadeController;
-
+class _CaroAppState extends State<CaroApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-      value: 1.0,
-    );
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    if (kDebugMode) {
+      debugPrint('🧹 [App] Disposing subscriptions...');
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return RestartScope(
-      child: MaterialApp(
-        title: 'Cờ Caro',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF4fc3f7),
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-          scaffoldBackgroundColor: const Color(0xFF070714),
-        ),
-        home: SplashModeScreen(
-          bettingScreenBuilder: () => const S88SplashScreen(),
-          fakeScreenBuilder: () => const SplashScreen(),
-          executeRestartWithFade: RestartScope.executeRestartApp,
-          splashScreenBuilder: () => const DefaultSplashScreen(),
-        ),
-      ),
-    );
+    return const SplashScreen();
   }
 }

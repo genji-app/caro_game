@@ -1,0 +1,109 @@
+import 'package:flutter/foundation.dart';
+import 'package:casino_settings/casino_settings.dart';
+
+import '../game_failure.dart';
+import '../models/models.dart';
+
+/// Mixin responsible for building the game home lobby based on remote configuration.
+mixin GameLobbyMixin {
+  /// Settings client for accessing lobby layout configuration.
+  CasinoSettingsClient get settingsClient;
+
+  /// Fetches games matching the given [filter].
+  Future<List<GameBlock>> getGames({String? query, GameFilter? filter});
+
+  /// Builds the complete game lobby using Server-Driven UI (SDUI).
+  Future<List<GameLobbyBlock>> getGameLobby() async {
+    final sections = settingsClient.config?.lobbySections ?? [];
+
+    if (sections.isEmpty) {
+      debugPrint('⚠️ GameLobbyMixin: No lobbySections found in configuration');
+      return [];
+    }
+
+    try {
+      final fetchEntries =
+          <({CasinoLobbySection section, GameFilter filter})>[];
+
+      for (final section in sections) {
+        final filter = _mapSectionToFilter(section);
+        if (filter != null) {
+          fetchEntries.add((section: section, filter: filter));
+        }
+      }
+
+      final results = await Future.wait(
+        fetchEntries.map((e) => getGames(filter: e.filter)),
+      );
+
+      final gamesBySection = <CasinoLobbySection, List<GameBlock>>{};
+      for (var i = 0; i < fetchEntries.length; i++) {
+        final entry = fetchEntries[i];
+        gamesBySection[entry.section] = _applyLimit(
+          results[i],
+          entry.section.displayLimit,
+        );
+      }
+
+      final List<GameLobbyBlock> lobbyBlocks = [];
+
+      for (final section in sections) {
+        final block = section.when(
+          strategy: (title, strategyId, params, limit) {
+            final games = gamesBySection[section] ?? [];
+            return games.isNotEmpty
+                ? GameGroupBlock(label: title, games: games)
+                : null;
+          },
+          inHouse: (title, limit) {
+            final games = gamesBySection[section] ?? [];
+            return games.isNotEmpty
+                ? GameGroupBlock(label: title, games: games)
+                : null;
+          },
+          gameType: (title, gameTypeId, limit) {
+            final games = gamesBySection[section] ?? [];
+            return games.isNotEmpty
+                ? GameGroupBlock(label: title, games: games)
+                : null;
+          },
+          provider: (title, providerId, limit) {
+            final games = gamesBySection[section] ?? [];
+            return games.isNotEmpty
+                ? GameGroupBlock(label: title, games: games)
+                : null;
+          },
+          banner: (bannerId) => GameBannerBlock(bannerId: bannerId),
+        );
+
+        if (block != null) {
+          lobbyBlocks.add(block);
+        }
+      }
+
+      return lobbyBlocks;
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(GetGameLobbyFailure(error), stackTrace);
+    }
+  }
+
+  /// Maps a [CasinoLobbySection] configuration into a [GameFilter].
+  GameFilter? _mapSectionToFilter(CasinoLobbySection section) {
+    return section.when(
+      strategy: (title, strategyId, params, limit) =>
+          GameFilter.fromStrategy(strategyId, params),
+      inHouse: (title, limit) => const GameFilter.isInHouse(),
+      gameType: (title, gameTypeId, limit) =>
+          GameFilter.byGameTypes(gameTypes: [GameType.fromJson(gameTypeId)]),
+      provider: (title, providerId, limit) =>
+          GameFilter.byProviders(providerIds: [providerId]),
+      banner: (bannerId) => null,
+    );
+  }
+
+  /// Takes only [limit] items from the [games] list.
+  List<GameBlock> _applyLimit(List<GameBlock> games, int limit) {
+    if (limit < 0 || games.length <= limit) return games;
+    return games.take(limit).toList();
+  }
+}

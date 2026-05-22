@@ -1,0 +1,15 @@
+import 'game_category.dart';
+
+/// {@template game_categories}
+/// A container for a list of game categories.
+/// {@endtemplate}
+class GameCategories {
+  /// {@macro game_categories}
+  const GameCategories({required this.all, this.categories = const []});
+
+  /// The "All" category (Lobby).
+  final GameCategory all;
+
+  /// List of other specific categories.
+  final List<GameCategory> categories;
+}

@@ -1,10 +1,12 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../core/achievements.dart';
 import '../core/app_settings.dart';
 import '../core/text_app_style.dart';
 import '../core/l10n.dart';
 import '../core/game_history.dart';
 import 'home_screen.dart';
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -56,6 +58,7 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.wait([
       AppSettings().load(),
       GameHistory().load(),
+      AchievementStore().load(), // US-004
     ]);
 
     l10n.setLanguage(AppSettings().language);
@@ -70,10 +73,12 @@ class _SplashScreenState extends State<SplashScreen>
       setState(() => _ready = true);
       await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) {
+        final bool seen = AppSettings().hasSeenOnboarding;
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const HomeScreen(),
+            pageBuilder: (_, __, ___) =>
+                seen ? const HomeScreen() : const OnboardingScreen(),
             transitionsBuilder: (_, anim, __, child) =>
                 FadeTransition(opacity: anim, child: child),
             transitionDuration: const Duration(milliseconds: 500),

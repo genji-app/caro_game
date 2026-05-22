@@ -1,0 +1,126 @@
+name: sun_sports
+description: "Sun Sports — embeddable Flutter package (formerly the s88-flutter app)."
+
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+25
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State Management
+  # hooks_riverpod: ^2.5.1
+  flutter_riverpod: ^2.5.1
+  # flutter_hooks: ^0.20.5
+
+  # Model
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.9.0
+
+  # Utils
+  google_fonts: ^6.2.1
+  dartz: ^0.10.1
+  crypto: ^3.0.3            # MD5 hashing for auth
+  uuid: ^4.2.1              # Generate device ID
+  device_info_plus: ^9.1.0  # Get device/OS info
+  web: ^1.1.1               # Web platform APIs (userAgent, etc.)
+  path_provider: ^2.1.0      # Get app documents directory for cache
+  isolate_manager: ^6.1.2   # Background processing for web & native
+  jwt_decoder: ^2.0.1       # JWT token decoder for extracting user info
+
+  # Networking
+  http: ^1.1.0
+  dio: ^5.7.0
+  connectivity_plus: ^6.1.0
+  pretty_dio_logger: ^1.4.0
+  shared_preferences: ^2.2.0
+  web_socket_channel: ^3.0.0
+ 
+  # Protobuf (required for sport_socket V2 protocol)
+  protobuf: ^6.0.0
+  fixnum: ^1.1.0
+
+  #routing
+  go_router: ^13.2.4
+
+  # Logging
+  logger: ^2.4.0
+  flutter_svg: ^2.2.2
+  cached_network_image: ^3.4.1
+  intl: ^0.20.2
+  gap: ^3.0.1
+  carousel_slider: ^5.1.1
+  webview_flutter: ^4.11.2
+  video_player: ^2.9.2
+  shimmer_animation: ^2.1.0
+  fluttertoast: ^8.2.8
+  url_launcher: ^6.2.5
+  grouped_list: ^6.0.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  flutter_in_app_pip: ^1.7.4
+  styled_text: ^8.1.0
+  pinput: ^6.0.1
+  lottie: ^3.3.2
+  rive: ^0.14.1
+  blur: ^4.0.2
+  # Audio
+  audioplayers: ^6.5.1
+  webview_flutter_wkwebview: ^3.23.7
+  gradient_borders: ^1.0.2
+
+  # Internal Packages
+  adaptive_overlay:
+    path: packages/adaptive_overlay
+  caxilo_config:
+    path: packages/caxilo_config
+  caxilo_repository:
+    path: packages/caxilo_repository    
+  flutter_slider_drawer:
+    path: packages/flutter_slider_drawer
+  game_api_client:
+    path: packages/game_api_client
+  game_engine:
+    path: packages/game_engine
+  fullscreen_guard:
+    path: packages/fullscreen_guard
+  orientation_guard:
+    path: packages/orientation_guard
+  sport_socket:
+    path: packages/sport_socket
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  mocktail: ^1.0.3
+  build_runner: ^2.10.1
+  freezed: ^3.2.3
+  json_serializable: ^6.8.0
+  flutter_gen_runner: ^5.12.0
+  isolate_manager_generator: ^0.3.0
+  flutter_inappwebview: ^6.1.5
+  fake_async: ^1.3.3
+
+# flutter_gen:
+#   output: lib/gen/ # Optional (default: lib/gen/)
+#   # line_length: 80 # Optional
+
+#   # Optional
+#   integrations:
+#     image: false
+#     flutter_svg: false
+#     rive: false
+#     lottie: false
+
+flutter:
+  uses-material-design: true
+  # For local testing
+  # assets:
+    # - assets/images/game_assets/

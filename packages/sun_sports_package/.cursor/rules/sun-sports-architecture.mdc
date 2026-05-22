@@ -1,0 +1,52 @@
+---
+description: Sun Sports monorepo layout, layers, and APIs actually used in this codebase
+alwaysApply: true
+---
+
+# Sun Sports — project architecture
+
+## Package and entry
+
+- App package name: `sun_sports`. Imports: `package:sun_sports/...`
+- Entry: `lib/main.dart` → `ProviderScope` + `App` (`lib/app.dart`)
+
+## Directory layout
+
+- **`lib/core/`** — cross-cutting: theme, breakpoints, router shell, errors (`Failure`, `ServerException`), logging, websocket stack, sport/game API clients, shared repositories under `core/services/repositories`, pagination helpers
+- **`lib/features/<feature>/`** — feature modules; typical split:
+  - `data/` — datasources, `*_impl` repositories, DTOs (`*.freezed.dart` alongside)
+  - `domain/` — entities, repository interfaces, use cases, Riverpod providers/notifiers, freezed state
+  - `presentation/` — screens/widgets; often subdivided `mobile/`, `tablet/`, `desktop/`
+- **`lib/shared/`** — reusable UI, responsive helpers, profile navigation shell, enums
+
+## Data and errors
+
+- Repositories return **`Future<Either<Failure, T>>`** (`dartz`) in the style of `AuthRepositoryImpl`
+- Map API models ↔ domain entities in repository/data layer; keep widgets free of JSON parsing
+- Use **`Failure`** / **`ServerException`** from `lib/core/error/` for consistent error handling
+
+## State management
+
+- **flutter_riverpod** only (no get_it). Prefer `ConsumerWidget` / `ConsumerStatefulWidget`; `ref.watch` for rebuilds, `ref.read` for one-off actions / inside listeners
+- Complex feature state: **`StateNotifier`** + `StateNotifierProvider` or dedicated notifiers under `domain/notifiers/`
+
+## Routing
+
+- Top-level: **`GoRouter`** in `lib/core/router/app_router.dart` (`MaterialApp.router`)
+- In-shell navigation (tabs, profile stack): **`Navigator.pushNamed`** / `MaterialPageRoute` patterns (see `ProfileRouter`, `MainShellLayout`)
+
+## Responsive UI
+
+- **`DeviceType`**: `mobile`, `tablet`, `desktop`, `largeDesktop` (`lib/shared/domain/enums/responsive_enums.dart`)
+- **`Breakpoints`** in `lib/core/constants/breakpoints.dart` — use **`ResponsiveBuilder.getDeviceType(context)`** or **`ResponsiveBuilder.responsive(...)`** (`lib/shared/responsive/responsive_builder.dart`)
+- Split presentation by breakpoint folders when behavior diverges (`mobile/` vs `desktop/`)
+
+## Local packages
+
+- `packages/sport_socket` — protobuf / websocket sport feed
+- `packages/adaptive_overlay`, `packages/flutter_slider_drawer` — UI utilities  
+Do not duplicate their behavior in app code; extend or wrap in `shared/` if needed.
+
+## Design references
+
+- Figma links and node-ids appear in widget comments; preserve them when touching implemented screens

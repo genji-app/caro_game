@@ -1,0 +1,26 @@
+---
+description: Repositories, use cases, and models for sun_sports features
+globs: lib/features/**/data/**/*.dart,lib/features/**/domain/**/*.dart
+alwaysApply: false
+---
+
+# Sun Sports — data and domain
+
+## Layering
+
+- **Repository interface** lives in `domain/repositories/`; **implementation** in `data/repositories/` with suffix `*RepositoryImpl`
+- **Remote/local datasources** in `data/datasources/` — repositories orchestrate them and map to entities
+
+## Models
+
+- Prefer **freezed + json_serializable** for DTOs/state already generated in the feature; run **`build_runner`** after changing annotated models
+- Keep **entities** in `domain/entities/` free of `json_annotation` when possible; conversion in mappers or `toEntity()` on models
+
+## Async contracts
+
+- Expose **`Either<Failure, T>`** from repositories; let notifiers/providers fold into UI state (loading/error/success)
+- Reuse **`Failure`** variants from `core/error/failures.dart` instead of raw strings in domain code
+
+## Calls from UI
+
+- Widgets should not call `Dio`/`http` directly; go through providers → repository/use case
